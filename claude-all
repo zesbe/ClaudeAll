@@ -1052,14 +1052,13 @@ if [[ -z "$choice" ]]; then
     echo " 17) Letta AI (GPT-5.2, Claude 4.5)      🧠 Model Selection"
     echo ""
     echo -e "${YELLOW}🔧 TOOLS & UTILITIES:${NC}"
-    echo " 18) 🔑 API Key Manager                   🔐 Update/Edit Keys"
+    echo " 18) 🔑 API Key Manager                   🔐 View/Edit/Delete Keys"
     echo " 19) 🤖 Claude Master Tool                 🎛️ Advanced UI"
-    echo " 20) 📊 API Manager                         📈 Monitor Usage"
-    echo " 21) ➕ Add/Edit/Delete Models               ⚙️ Custom Models"
+    echo " 20) ➕ Add/Edit/Delete Models               ⚙️ Custom Models"
     echo ""
 
     # Display custom models
-    next_num=22
+    next_num=21
     has_custom=false
     custom_models_array=()
     while IFS= read -r model_info; do
@@ -1154,6 +1153,212 @@ get_api_key_with_save() {
     if [[ -n "${!var_name}" && ! -f "$key_file" ]]; then
         save_api_key "${!var_name}" "$key_file" "$provider_name"
     fi
+}
+
+# API Key Manager - Built-in function to manage all API keys
+api_key_manager() {
+    while true; do
+        clear
+        echo -e "${GREEN}═════════════════════════════════════════════${NC}"
+        echo -e "${GREEN}           🔑 API KEY MANAGER                ${NC}"
+        echo -e "${GREEN}═════════════════════════════════════════════${NC}"
+        echo ""
+
+        # List all API key files
+        local api_keys=(
+            "minimax:MiniMax:$HOME/.minimax_api_key"
+            "gemini:Google Gemini:$HOME/.gemini_api_key"
+            "openai:OpenAI:$HOME/.openai_api_key"
+            "xai:xAI (Grok):$HOME/.xai_api_key"
+            "glm:ZhipuAI (GLM):$HOME/.glm_api_key"
+            "groq:Groq:$HOME/.groq_api_key"
+            "perplexity:Perplexity:$HOME/.perplexity_api_key"
+            "cohere:Cohere:$HOME/.cohere_api_key"
+            "deepseek:DeepSeek:$HOME/.deepseek_api_key"
+            "ollama:Ollama:$HOME/.ollama_api_key"
+            "mistral:Mistral:$HOME/.mistral_api_key"
+            "moonshot:Moonshot:$HOME/.moonshot_api_key"
+            "qwen:Qwen (Alibaba):$HOME/.qwen_api_key"
+            "openrouter:OpenRouter:$HOME/.openrouter_api_key"
+            "letta:Letta AI:$HOME/.letta_api_key"
+        )
+
+        echo -e "${YELLOW}📋 Saved API Keys:${NC}"
+        echo ""
+        local count=0
+        for key_info in "${api_keys[@]}"; do
+            IFS=':' read -r id name file <<< "$key_info"
+            if [[ -f "$file" ]]; then
+                local key_value=$(cat "$file" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                if [[ -n "$key_value" ]]; then
+                    ((count++))
+                    # Mask the key - show first 8 and last 4 chars
+                    local key_len=${#key_value}
+                    if [[ $key_len -gt 12 ]]; then
+                        local masked="${key_value:0:8}...${key_value: -4}"
+                    else
+                        local masked="${key_value:0:4}..."
+                    fi
+                    printf "  %-3s %-20s %s\n" "$count)" "$name" "$masked"
+                fi
+            fi
+        done
+
+        if [[ $count -eq 0 ]]; then
+            echo -e "${RED}  No API keys saved yet${NC}"
+        fi
+
+        echo ""
+        echo -e "${YELLOW}🔧 Actions:${NC}"
+        echo "  v) View full API key"
+        echo "  e) Edit/Update API key"
+        echo "  d) Delete API key"
+        echo "  a) Add new API key"
+        echo "  c) Clear all API keys"
+        echo "  b) Back to main menu"
+        echo ""
+        echo -e "${GREEN}═════════════════════════════════════════════${NC}"
+
+        read -p "Choose action: " action
+
+        case "$action" in
+            v|V)
+                read -p "Enter provider name (e.g., minimax, openai): " provider
+                local found=false
+                for key_info in "${api_keys[@]}"; do
+                    IFS=':' read -r id name file <<< "$key_info"
+                    if [[ "$id" == "$provider" ]]; then
+                        found=true
+                        if [[ -f "$file" ]]; then
+                            local key_value=$(cat "$file" 2>/dev/null)
+                            echo ""
+                            echo -e "${GREEN}API Key for $name:${NC}"
+                            echo "$key_value"
+                        else
+                            echo -e "${RED}No API key saved for $name${NC}"
+                        fi
+                        break
+                    fi
+                done
+                if [[ "$found" == "false" ]]; then
+                    echo -e "${RED}Provider not found${NC}"
+                fi
+                echo ""
+                read -p "Press Enter to continue..."
+                ;;
+
+            e|E)
+                read -p "Enter provider name (e.g., minimax, openai): " provider
+                local found=false
+                for key_info in "${api_keys[@]}"; do
+                    IFS=':' read -r id name file <<< "$key_info"
+                    if [[ "$id" == "$provider" ]]; then
+                        found=true
+                        echo ""
+                        if [[ -f "$file" ]]; then
+                            local old_key=$(cat "$file" 2>/dev/null)
+                            echo -e "${YELLOW}Current key: ${old_key:0:8}...${old_key: -4}${NC}"
+                        fi
+                        read -p "Enter new API key for $name: " new_key
+                        if [[ -n "$new_key" ]]; then
+                            save_api_key "$new_key" "$file" "$name"
+                            echo -e "${GREEN}✓ API key updated successfully${NC}"
+                        else
+                            echo -e "${RED}✗ Empty key - not saved${NC}"
+                        fi
+                        break
+                    fi
+                done
+                if [[ "$found" == "false" ]]; then
+                    echo -e "${RED}Provider not found${NC}"
+                fi
+                echo ""
+                read -p "Press Enter to continue..."
+                ;;
+
+            d|D)
+                read -p "Enter provider name (e.g., minimax, openai): " provider
+                local found=false
+                for key_info in "${api_keys[@]}"; do
+                    IFS=':' read -r id name file <<< "$key_info"
+                    if [[ "$id" == "$provider" ]]; then
+                        found=true
+                        if [[ -f "$file" ]]; then
+                            read -p "Delete API key for $name? (y/n): " confirm
+                            if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                                rm -f "$file"
+                                echo -e "${GREEN}✓ API key deleted${NC}"
+                            else
+                                echo "Cancelled"
+                            fi
+                        else
+                            echo -e "${RED}No API key saved for $name${NC}"
+                        fi
+                        break
+                    fi
+                done
+                if [[ "$found" == "false" ]]; then
+                    echo -e "${RED}Provider not found${NC}"
+                fi
+                echo ""
+                read -p "Press Enter to continue..."
+                ;;
+
+            a|A)
+                echo ""
+                echo "Available providers:"
+                for i in "${!api_keys[@]}"; do
+                    IFS=':' read -r id name file <<< "${api_keys[$i]}"
+                    printf "  - %-15s (%s)\n" "$id" "$name"
+                done
+                echo ""
+                read -p "Enter provider name: " provider
+                local found=false
+                for key_info in "${api_keys[@]}"; do
+                    IFS=':' read -r id name file <<< "$key_info"
+                    if [[ "$id" == "$provider" ]]; then
+                        found=true
+                        read -p "Enter API key for $name: " new_key
+                        if [[ -n "$new_key" ]]; then
+                            save_api_key "$new_key" "$file" "$name"
+                        else
+                            echo -e "${RED}✗ Empty key - not saved${NC}"
+                        fi
+                        break
+                    fi
+                done
+                if [[ "$found" == "false" ]]; then
+                    echo -e "${RED}Provider not found${NC}"
+                fi
+                echo ""
+                read -p "Press Enter to continue..."
+                ;;
+
+            c|C)
+                read -p "Delete ALL API keys? This cannot be undone! (yes/no): " confirm
+                if [[ "$confirm" == "yes" ]]; then
+                    for key_info in "${api_keys[@]}"; do
+                        IFS=':' read -r id name file <<< "$key_info"
+                        rm -f "$file"
+                    done
+                    echo -e "${GREEN}✓ All API keys cleared${NC}"
+                else
+                    echo "Cancelled"
+                fi
+                echo ""
+                read -p "Press Enter to continue..."
+                ;;
+
+            b|B)
+                return 0
+                ;;
+
+            *)
+                echo -e "${RED}Invalid choice${NC}"
+                sleep 1
+                ;;
+        esac
+    done
 }
 
 # Function to save chat context when switching providers
@@ -2028,17 +2233,8 @@ EOF
         exec claude --model "$MODEL_NAME" --system-prompt "$system_prompt"
         ;;
     18)
-        # API Key Manager
-        echo -e "${BLUE}Opening API Key Manager...${NC}"
-        # Check if api-manager exists in the same directory
-        if [[ -f "$SCRIPT_DIR/api-manager" ]]; then
-            "$SCRIPT_DIR/api-manager"
-        else
-            echo -e "${YELLOW}API Manager not found. Please install or check path.${NC}"
-        fi
-        echo ""
-        echo -e "${YELLOW}Press Enter to return to main menu...${NC}"
-        read
+        # API Key Manager - Built-in function
+        api_key_manager
         # Restart the menu
         exec "$0"
         ;;
@@ -2063,21 +2259,6 @@ EOF
         exec "$0"
         ;;
     20)
-        # API Manager
-        echo -e "${BLUE}Opening API Manager...${NC}"
-        # Check if api-manager script exists
-        if [[ -f "$SCRIPT_DIR/api-manager" ]]; then
-            "$SCRIPT_DIR/api-manager" --usage
-        else
-            echo -e "${YELLOW}API Manager not found. Please install or check path.${NC}"
-        fi
-        echo ""
-        echo -e "${YELLOW}Press Enter to return to main menu...${NC}"
-        read
-        # Restart the menu
-        exec "$0"
-        ;;
-    21)
         # Add/Edit/Delete Models
         echo -e "${BLUE}Opening Model Management...${NC}"
         # Check if model-management script exists
