@@ -1164,8 +1164,8 @@ api_key_manager() {
         echo -e "${GREEN}═════════════════════════════════════════════${NC}"
         echo ""
 
-        # List all API key files
-        local api_keys=(
+        # All providers
+        local all_providers=(
             "minimax:MiniMax:$HOME/.minimax_api_key"
             "gemini:Google Gemini:$HOME/.gemini_api_key"
             "openai:OpenAI:$HOME/.openai_api_key"
@@ -1183,35 +1183,39 @@ api_key_manager() {
             "letta:Letta AI:$HOME/.letta_api_key"
         )
 
-        echo -e "${YELLOW}📋 Saved API Keys:${NC}"
-        echo ""
-        local count=0
-        for key_info in "${api_keys[@]}"; do
+        # Build array of saved keys only
+        local saved_keys=()
+        for key_info in "${all_providers[@]}"; do
             IFS=':' read -r id name file <<< "$key_info"
             if [[ -f "$file" ]]; then
                 local key_value=$(cat "$file" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
                 if [[ -n "$key_value" ]]; then
-                    ((count++))
-                    # Mask the key - show first 8 and last 4 chars
-                    local key_len=${#key_value}
-                    if [[ $key_len -gt 12 ]]; then
-                        local masked="${key_value:0:8}...${key_value: -4}"
-                    else
-                        local masked="${key_value:0:4}..."
-                    fi
-                    printf "  %-3s %-20s %s\n" "$count)" "$name" "$masked"
+                    saved_keys+=("$id:$name:$file:$key_value")
                 fi
             fi
         done
 
-        if [[ $count -eq 0 ]]; then
+        echo -e "${YELLOW}📋 Saved API Keys:${NC}"
+        echo ""
+        if [[ ${#saved_keys[@]} -eq 0 ]]; then
             echo -e "${RED}  No API keys saved yet${NC}"
+        else
+            for i in "${!saved_keys[@]}"; do
+                IFS=':' read -r id name file key_value <<< "${saved_keys[$i]}"
+                local key_len=${#key_value}
+                if [[ $key_len -gt 12 ]]; then
+                    local masked="${key_value:0:8}...${key_value: -4}"
+                else
+                    local masked="${key_value:0:4}..."
+                fi
+                printf "  %-3s %-20s %s\n" "$((i+1)))" "$name" "$masked"
+            done
         fi
 
         echo ""
         echo -e "${YELLOW}🔧 Actions:${NC}"
+        echo "  ${BLUE}Just enter NUMBER to edit that key!${NC}"
         echo "  v) View full API key"
-        echo "  e) Edit/Update API key"
         echo "  d) Delete API key"
         echo "  a) Add new API key"
         echo "  c) Clear all API keys"
@@ -1219,86 +1223,80 @@ api_key_manager() {
         echo ""
         echo -e "${GREEN}═════════════════════════════════════════════${NC}"
 
-        read -p "Choose action: " action
+        read -p "Choose [number/action]: " action
 
-        case "$action" in
-            v|V)
-                read -p "Enter provider name (e.g., minimax, openai): " provider
-                local found=false
-                for key_info in "${api_keys[@]}"; do
-                    IFS=':' read -r id name file <<< "$key_info"
-                    if [[ "$id" == "$provider" ]]; then
-                        found=true
-                        if [[ -f "$file" ]]; then
-                            local key_value=$(cat "$file" 2>/dev/null)
-                            echo ""
-                            echo -e "${GREEN}API Key for $name:${NC}"
-                            echo "$key_value"
-                        else
-                            echo -e "${RED}No API key saved for $name${NC}"
-                        fi
-                        break
-                    fi
-                done
-                if [[ "$found" == "false" ]]; then
-                    echo -e "${RED}Provider not found${NC}"
+        # Check if input is a number for quick edit
+        if [[ "$action" =~ ^[0-9]+$ ]]; then
+            local idx=$((action - 1))
+            if [[ $idx -ge 0 && $idx -lt ${#saved_keys[@]} ]]; then
+                IFS=':' read -r id name file old_key <<< "${saved_keys[$idx]}"
+                echo ""
+                echo -e "${YELLOW}Editing: $name${NC}"
+                echo -e "${YELLOW}Current: ${old_key:0:8}...${old_key: -4}${NC}"
+                read -p "Enter new API key: " new_key
+                if [[ -n "$new_key" ]]; then
+                    save_api_key "$new_key" "$file" "$name"
+                    echo -e "${GREEN}✓ API key updated${NC}"
+                else
+                    echo -e "${RED}✗ Empty - not saved${NC}"
                 fi
                 echo ""
                 read -p "Press Enter to continue..."
-                ;;
+            else
+                echo -e "${RED}Invalid number${NC}"
+                sleep 1
+            fi
+            continue
+        fi
 
-            e|E)
-                read -p "Enter provider name (e.g., minimax, openai): " provider
-                local found=false
-                for key_info in "${api_keys[@]}"; do
-                    IFS=':' read -r id name file <<< "$key_info"
-                    if [[ "$id" == "$provider" ]]; then
-                        found=true
+        case "$action" in
+            v|V)
+                if [[ ${#saved_keys[@]} -eq 0 ]]; then
+                    echo -e "${RED}No API keys saved${NC}"
+                    sleep 1
+                    continue
+                fi
+                read -p "Enter number [1-${#saved_keys[@]}]: " num
+                if [[ "$num" =~ ^[0-9]+$ ]]; then
+                    local idx=$((num - 1))
+                    if [[ $idx -ge 0 && $idx -lt ${#saved_keys[@]} ]]; then
+                        IFS=':' read -r id name file key_value <<< "${saved_keys[$idx]}"
                         echo ""
-                        if [[ -f "$file" ]]; then
-                            local old_key=$(cat "$file" 2>/dev/null)
-                            echo -e "${YELLOW}Current key: ${old_key:0:8}...${old_key: -4}${NC}"
-                        fi
-                        read -p "Enter new API key for $name: " new_key
-                        if [[ -n "$new_key" ]]; then
-                            save_api_key "$new_key" "$file" "$name"
-                            echo -e "${GREEN}✓ API key updated successfully${NC}"
-                        else
-                            echo -e "${RED}✗ Empty key - not saved${NC}"
-                        fi
-                        break
+                        echo -e "${GREEN}API Key for $name:${NC}"
+                        echo "$key_value"
+                    else
+                        echo -e "${RED}Invalid number${NC}"
                     fi
-                done
-                if [[ "$found" == "false" ]]; then
-                    echo -e "${RED}Provider not found${NC}"
+                else
+                    echo -e "${RED}Invalid input${NC}"
                 fi
                 echo ""
                 read -p "Press Enter to continue..."
                 ;;
 
             d|D)
-                read -p "Enter provider name (e.g., minimax, openai): " provider
-                local found=false
-                for key_info in "${api_keys[@]}"; do
-                    IFS=':' read -r id name file <<< "$key_info"
-                    if [[ "$id" == "$provider" ]]; then
-                        found=true
-                        if [[ -f "$file" ]]; then
-                            read -p "Delete API key for $name? (y/n): " confirm
-                            if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
-                                rm -f "$file"
-                                echo -e "${GREEN}✓ API key deleted${NC}"
-                            else
-                                echo "Cancelled"
-                            fi
+                if [[ ${#saved_keys[@]} -eq 0 ]]; then
+                    echo -e "${RED}No API keys to delete${NC}"
+                    sleep 1
+                    continue
+                fi
+                read -p "Enter number [1-${#saved_keys[@]}]: " num
+                if [[ "$num" =~ ^[0-9]+$ ]]; then
+                    local idx=$((num - 1))
+                    if [[ $idx -ge 0 && $idx -lt ${#saved_keys[@]} ]]; then
+                        IFS=':' read -r id name file key_value <<< "${saved_keys[$idx]}"
+                        read -p "Delete $name key? (y/n): " confirm
+                        if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                            rm -f "$file"
+                            echo -e "${GREEN}✓ Deleted${NC}"
                         else
-                            echo -e "${RED}No API key saved for $name${NC}"
+                            echo "Cancelled"
                         fi
-                        break
+                    else
+                        echo -e "${RED}Invalid number${NC}"
                     fi
-                done
-                if [[ "$found" == "false" ]]; then
-                    echo -e "${RED}Provider not found${NC}"
+                else
+                    echo -e "${RED}Invalid input${NC}"
                 fi
                 echo ""
                 read -p "Press Enter to continue..."
@@ -1306,42 +1304,41 @@ api_key_manager() {
 
             a|A)
                 echo ""
-                echo "Available providers:"
-                for i in "${!api_keys[@]}"; do
-                    IFS=':' read -r id name file <<< "${api_keys[$i]}"
-                    printf "  - %-15s (%s)\n" "$id" "$name"
+                echo -e "${YELLOW}Available providers:${NC}"
+                for i in "${!all_providers[@]}"; do
+                    IFS=':' read -r id name file <<< "${all_providers[$i]}"
+                    printf "  %-3s %-15s (%s)\n" "$((i+1)))" "$id" "$name"
                 done
                 echo ""
-                read -p "Enter provider name: " provider
-                local found=false
-                for key_info in "${api_keys[@]}"; do
-                    IFS=':' read -r id name file <<< "$key_info"
-                    if [[ "$id" == "$provider" ]]; then
-                        found=true
+                read -p "Enter number [1-${#all_providers[@]}]: " num
+                if [[ "$num" =~ ^[0-9]+$ ]]; then
+                    local idx=$((num - 1))
+                    if [[ $idx -ge 0 && $idx -lt ${#all_providers[@]} ]]; then
+                        IFS=':' read -r id name file <<< "${all_providers[$idx]}"
                         read -p "Enter API key for $name: " new_key
                         if [[ -n "$new_key" ]]; then
                             save_api_key "$new_key" "$file" "$name"
                         else
-                            echo -e "${RED}✗ Empty key - not saved${NC}"
+                            echo -e "${RED}✗ Empty - not saved${NC}"
                         fi
-                        break
+                    else
+                        echo -e "${RED}Invalid number${NC}"
                     fi
-                done
-                if [[ "$found" == "false" ]]; then
-                    echo -e "${RED}Provider not found${NC}"
+                else
+                    echo -e "${RED}Invalid input${NC}"
                 fi
                 echo ""
                 read -p "Press Enter to continue..."
                 ;;
 
             c|C)
-                read -p "Delete ALL API keys? This cannot be undone! (yes/no): " confirm
+                read -p "Delete ALL API keys? Type 'yes' to confirm: " confirm
                 if [[ "$confirm" == "yes" ]]; then
-                    for key_info in "${api_keys[@]}"; do
+                    for key_info in "${all_providers[@]}"; do
                         IFS=':' read -r id name file <<< "$key_info"
                         rm -f "$file"
                     done
-                    echo -e "${GREEN}✓ All API keys cleared${NC}"
+                    echo -e "${GREEN}✓ All keys cleared${NC}"
                 else
                     echo "Cancelled"
                 fi
@@ -1354,7 +1351,7 @@ api_key_manager() {
                 ;;
 
             *)
-                echo -e "${RED}Invalid choice${NC}"
+                echo -e "${RED}Invalid action${NC}"
                 sleep 1
                 ;;
         esac
