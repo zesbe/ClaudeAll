@@ -4,8 +4,6 @@
 # Supports: Linux, Termux, macOS, Windows (Git Bash/WSL)
 # Includes Superpowers Library (30 skills + 14 agents)
 
-set -e
-
 # Platform detection
 detect_platform() {
     case "$(uname -s)" in
