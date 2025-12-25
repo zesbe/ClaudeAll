@@ -548,6 +548,305 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+## 🔄 Update & Publish Guide (For Maintainers)
+
+### Prerequisites
+```bash
+# Make sure you have Node.js and npm installed
+node --version  # Should be >= 14.0.0
+npm --version
+
+# Login to npm (one time setup)
+npm login
+
+# Login to GitHub CLI (one time setup)
+gh auth login
+```
+
+### Development Workflow
+
+#### 1. Clone and Setup
+```bash
+# Clone repository
+git clone https://github.com/zesbe/ClaudeAll.git
+cd ClaudeAll
+
+# Install dependencies (if any)
+npm install
+
+# Test locally
+./claude-all --version
+```
+
+#### 2. Make Changes
+```bash
+# Create a new branch for your feature/fix
+git checkout -b feature/your-feature-name
+
+# Make your changes to code, documentation, etc.
+# Edit files: claude-all, README.md, package.json, etc.
+
+# Test your changes
+./claude-all  # Test the launcher
+```
+
+#### 3. Update Version
+```bash
+# Update version in 3 places:
+
+# 1. VERSION file
+echo "8.1.5" > VERSION
+
+# 2. package.json
+# Change: "version": "8.1.4" to "version": "8.1.5"
+
+# 3. README.md (2 locations)
+# Line 1: # 🤖 Claude-All: Universal AI CLI Launcher v8.1.5
+# Package Info section: - **Version**: 8.1.5
+```
+
+#### 4. Commit Changes
+```bash
+# Stage all changes
+git add .
+
+# Commit with descriptive message
+git commit -m "feat: Your feature description
+
+- Added feature X
+- Fixed bug Y
+- Updated documentation
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+```
+
+#### 5. Push to GitHub
+```bash
+# For main branch (direct push)
+git push origin main
+
+# For feature branch (create PR)
+git push origin feature/your-feature-name
+# Then create Pull Request on GitHub
+```
+
+#### 6. Publish to npm
+```bash
+# Make sure you're logged in
+npm whoami
+
+# Check current published version
+npm view claude-all-ai-launcher version
+
+# Publish new version
+npm publish --access public
+
+# Verify publication
+npm view claude-all-ai-launcher version
+```
+
+### Quick Update Script
+
+Create a file `update-and-publish.sh`:
+
+```bash
+#!/bin/bash
+
+# Update and Publish Script for Claude-All
+
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+# Get new version from argument or prompt
+if [ -z "$1" ]; then
+    echo -e "${BLUE}Current version:${NC}"
+    cat VERSION
+    read -p "Enter new version (e.g., 8.1.5): " NEW_VERSION
+else
+    NEW_VERSION=$1
+fi
+
+echo -e "${BLUE}Updating to version ${NEW_VERSION}...${NC}"
+
+# 1. Update VERSION file
+echo $NEW_VERSION > VERSION
+echo -e "${GREEN}✓ Updated VERSION${NC}"
+
+# 2. Update package.json
+sed -i "s/\"version\": \".*\"/\"version\": \"$NEW_VERSION\"/" package.json
+echo -e "${GREEN}✓ Updated package.json${NC}"
+
+# 3. Update README.md
+sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v$NEW_VERSION/g" README.md
+echo -e "${GREEN}✓ Updated README.md${NC}"
+
+# 4. Git commit
+git add VERSION package.json README.md
+git commit -m "🚀 Bump version to $NEW_VERSION
+
+Updated version across all files for release $NEW_VERSION
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+echo -e "${GREEN}✓ Committed changes${NC}"
+
+# 5. Push to GitHub
+echo -e "${BLUE}Pushing to GitHub...${NC}"
+git push origin main
+echo -e "${GREEN}✓ Pushed to GitHub${NC}"
+
+# 6. Publish to npm
+echo -e "${BLUE}Publishing to npm...${NC}"
+npm publish --access public
+echo -e "${GREEN}✓ Published to npm${NC}"
+
+# 7. Verify
+echo -e "${BLUE}Verifying publication...${NC}"
+sleep 3
+PUBLISHED_VERSION=$(npm view claude-all-ai-launcher version)
+echo -e "${GREEN}✓ npm version: $PUBLISHED_VERSION${NC}"
+
+echo -e "${GREEN}=====================================${NC}"
+echo -e "${GREEN}Update and publish completed!${NC}"
+echo -e "${GREEN}=====================================${NC}"
+echo -e "${BLUE}GitHub:${NC} https://github.com/zesbe/ClaudeAll"
+echo -e "${BLUE}npm:${NC} https://www.npmjs.com/package/claude-all-ai-launcher"
+```
+
+Make it executable:
+```bash
+chmod +x update-and-publish.sh
+
+# Usage
+./update-and-publish.sh 8.1.5
+```
+
+### Manual Update Commands
+
+#### Update Documentation Only
+```bash
+# Edit README.md or docs
+git add README.md docs/
+git commit -m "📚 Update documentation"
+git push origin main
+# No npm publish needed for docs-only changes
+```
+
+#### Update Code Only
+```bash
+# Edit claude-all or other code files
+git add claude-all bin/ utils/
+git commit -m "🐛 Fix bug in provider selection"
+git push origin main
+
+# Bump version and publish
+echo "8.1.5" > VERSION
+# Update package.json and README.md version
+git add VERSION package.json README.md
+git commit -m "🚀 Bump version to 8.1.5"
+git push origin main
+npm publish --access public
+```
+
+#### Hotfix Workflow
+```bash
+# For urgent fixes
+git checkout -b hotfix/critical-bug
+# Make fix
+git commit -m "🔥 Hotfix: Critical security patch"
+git push origin hotfix/critical-bug
+
+# Merge to main
+git checkout main
+git merge hotfix/critical-bug
+git push origin main
+
+# Bump patch version
+echo "8.1.5" > VERSION
+# Update package.json and README.md
+git add VERSION package.json README.md
+git commit -m "🚀 Version 8.1.5 - Security hotfix"
+git push origin main
+npm publish --access public
+```
+
+### Version Numbering Guide
+
+Follow [Semantic Versioning](https://semver.org/):
+
+- **Major (X.0.0)**: Breaking changes
+  - Example: `8.1.4` → `9.0.0`
+  - When: API changes, removed features, major refactor
+
+- **Minor (0.X.0)**: New features (backward compatible)
+  - Example: `8.1.4` → `8.2.0`
+  - When: New AI providers, new commands, new features
+
+- **Patch (0.0.X)**: Bug fixes
+  - Example: `8.1.4` → `8.1.5`
+  - When: Bug fixes, documentation updates, minor improvements
+
+### Pre-publish Checklist
+
+Before publishing a new version:
+
+- [ ] Update VERSION file
+- [ ] Update package.json version
+- [ ] Update README.md version (2 places)
+- [ ] Test locally: `./claude-all --version`
+- [ ] Run any tests if available
+- [ ] Check git status is clean
+- [ ] Review CHANGELOG or commit messages
+- [ ] Commit all changes
+- [ ] Push to GitHub
+- [ ] Verify GitHub Actions (if configured)
+- [ ] Publish to npm
+- [ ] Verify npm package page
+- [ ] Test installation: `npm install -g claude-all-ai-launcher@latest`
+
+### Troubleshooting Updates
+
+#### npm publish fails
+```bash
+# Check if you're logged in
+npm whoami
+
+# Check version doesn't already exist
+npm view claude-all-ai-launcher versions
+
+# Version already published? Bump to next version
+echo "8.1.5" > VERSION
+# Update package.json and README.md
+npm publish --access public
+```
+
+#### Git push rejected
+```bash
+# Pull latest changes first
+git pull origin main --rebase
+
+# Then push
+git push origin main
+```
+
+#### Version mismatch
+```bash
+# Ensure all 3 files have same version:
+cat VERSION
+grep '"version"' package.json
+grep 'v[0-9]' README.md | head -2
+
+# Fix if needed and commit
+git add VERSION package.json README.md
+git commit -m "🔧 Fix version mismatch"
+```
+
 ## 🎯 Quick Start Examples
 
 ### Chat with MiniMax
