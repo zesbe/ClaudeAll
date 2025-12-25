@@ -1097,6 +1097,12 @@ save_api_key() {
     local key_file="$2"
     local provider_name="$3"
 
+    # Validate key is not empty
+    if [[ -z "$key" || "$key" =~ ^[[:space:]]*$ ]]; then
+        echo -e "${RED}✗ API key cannot be empty${NC}"
+        return 1
+    fi
+
     echo "$key" > "$key_file"
     chmod 600 "$key_file"
     echo -e "${GREEN}✓ $provider_name API key saved to $key_file${NC}"
@@ -1107,7 +1113,7 @@ load_api_key() {
     local var_name="$2"
 
     if [[ -f "$key_file" ]]; then
-        local key=$(cat "$key_file" 2>/dev/null)
+        local key=$(cat "$key_file" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         if [[ -n "$key" ]]; then
             export "$var_name=$key"
             return 0
@@ -1129,16 +1135,24 @@ get_api_key_with_save() {
     fi
 
     # Still empty? Ask user
-    if [[ -z "${!var_name}" ]]; then
+    while [[ -z "${!var_name}" ]]; do
         echo "Get Key: $key_url"
         read -p "Enter $provider_name API Key: " key_input
+
+        # Validate input
+        if [[ -z "$key_input" || "$key_input" =~ ^[[:space:]]*$ ]]; then
+            echo -e "${RED}✗ API key cannot be empty. Please try again.${NC}"
+            continue
+        fi
+
         export "$var_name=$key_input"
         save_api_key "$key_input" "$key_file" "$provider_name"
-    else
-        # Save current key if not already saved
-        if [[ ! -f "$key_file" ]]; then
-            save_api_key "${!var_name}" "$key_file" "$provider_name"
-        fi
+        break
+    done
+
+    # Save current key if not already saved
+    if [[ -n "${!var_name}" && ! -f "$key_file" ]]; then
+        save_api_key "${!var_name}" "$key_file" "$provider_name"
     fi
 }
 
