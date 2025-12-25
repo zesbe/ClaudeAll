@@ -41,15 +41,132 @@ npm install -g claude-all-ai-launcher && npm run config && claude-all
 
 ## 🌟 Key Features
 
-### 🤖 Universal AI Support
+### 🤖 Universal AI Support (23 Providers)
 - **MiniMax** - High-performance Chinese AI
 - **Google Gemini** - Advanced multimodal AI
 - **OpenAI** - GPT-4 and GPT-3.5 Turbo
+- **xAI/Grok** - Real-time AI by xAI
 - **Groq** - Ultra-fast Llama inference
+- **DeepSeek** - Advanced reasoning AI
+- **Perplexity** - Search-powered AI
+- **Letta AI** - Stateful AI agents
 - **Ollama** - Local LLM hosting
-- **xAI/Grok** - xAI Grok models
 - **ZhipuAI/GLM** - GLM series models
+- **Cohere** - Enterprise AI models
+- **Mistral** - European AI models
+- **Moonshot** - Chinese AI platform
+- **Qwen** - Alibaba Cloud AI
+- **OpenRouter** - Multi-provider aggregator
 - **Custom APIs** - Any REST API endpoint
+
+## 📡 API Endpoints & Configuration
+
+### Quick Access Models
+
+| # | Provider | API Endpoint | Get API Key | Environment Variable |
+|---|----------|--------------|-------------|---------------------|
+| 1 | **MiniMax** | `https://api.minimax.io/anthropic` | [Get Key](https://platform.minimax.io/) | `MINIMAX_API_KEY` |
+| 2 | **Gemini (API Key)** | `https://generativelanguage.googleapis.com/v1beta/anthropic` | [Get Key](https://aistudio.google.com/app/apikey) | `GEMINI_API_KEY` |
+| 3 | **AntiGravity (OAuth)** | `https://antigravity.corp.google.com/v1` | Internal Google Only | `GOOGLE_AUTH_TOKEN` |
+| 4 | **OpenAI** | `https://api.openai.com/v1` | [Get Key](https://platform.openai.com/api-keys) | `OPENAI_API_KEY` |
+| 5 | **OpenAI (OAuth)** | `https://api.openai.com/v1` | OAuth Flow | `OPENAI_ACCESS_TOKEN` |
+
+### Cloud Providers
+
+| # | Provider | API Endpoint | Get API Key | Environment Variable |
+|---|----------|--------------|-------------|---------------------|
+| 6 | **xAI / Grok** | `https://api.x.ai/v1` | [Get Key](https://console.x.ai/) | `XAI_API_KEY` |
+| 7 | **ZhipuAI / GLM** | `https://open.bigmodel.cn/api/paas/v4` | [Get Key](https://open.bigmodel.cn/) | `ZHIPUAI_API_KEY` |
+| 8 | **Groq** | `https://api.groq.com/openai/v1` | [Get Key](https://console.groq.com/keys) | `GROQ_API_KEY` |
+| 9 | **Perplexity** | `https://api.perplexity.ai/` | [Get Key](https://www.perplexity.ai/settings/api) | `PERPLEXITY_API_KEY` |
+| 10 | **Cohere** | `https://api.cohere.ai/v1` | [Get Key](https://dashboard.cohere.com/api-keys) | `COHERE_API_KEY` |
+| 11 | **DeepSeek** | `https://api.deepseek.com/v1` | [Get Key](https://platform.deepseek.com/api_keys) | `DEEPSEEK_API_KEY` |
+
+### AI Agents & Special
+
+| # | Provider | API Endpoint | Get API Key | Environment Variable |
+|---|----------|--------------|-------------|---------------------|
+| 17 | **Letta AI** | `https://api.letta.com/v1` | [Documentation](https://docs.letta.com) | `LETTA_API_KEY` |
+
+### Local & Self-Hosted
+
+| # | Provider | API Endpoint | Get API Key | Environment Variable |
+|---|----------|--------------|-------------|---------------------|
+| 12 | **Ollama** | `http://localhost:11434/v1` | Local (No Key Required) | - |
+
+### Regional Providers
+
+| # | Provider | API Endpoint | Get API Key | Environment Variable |
+|---|----------|--------------|-------------|---------------------|
+| 13 | **Mistral** | `https://api.mistral.ai/v1` | [Get Key](https://console.mistral.ai/api-keys/) | `MISTRAL_API_KEY` |
+| 14 | **Moonshot** | `https://api.moonshot.cn/v1` | [Get Key](https://platform.moonshot.cn/console/api-keys) | `MOONSHOT_API_KEY` |
+| 15 | **Qwen** | `https://dashscope.aliyuncs.com/compatible-mode/v1` | [Get Key](https://dashscope.console.aliyun.com/apiKey) | `QWEN_API_KEY` |
+
+### Multi-Provider
+
+| # | Provider | API Endpoint | Get API Key | Environment Variable |
+|---|----------|--------------|-------------|---------------------|
+| 16 | **OpenRouter** | `https://openrouter.ai/api/v1` | [Get Key](https://openrouter.ai/keys) | `OPENROUTER_API_KEY` |
+
+### Tools & Utilities
+
+| # | Tool | Description |
+|---|------|-------------|
+| 18 | **API Key Manager** | Manage and update all API keys |
+| 19 | **Claude Master Tool** | Advanced UI for model management |
+| 20 | **API Manager** | Monitor API usage and costs |
+| 21 | **Model Management** | Add/Edit/Delete custom models |
+| 22 | **Custom Models** | Your custom model configurations |
+| 23 | **Model Management Tools** | Advanced model configuration |
+
+### Environment Variables Setup
+
+```bash
+# Quick Access Models
+export MINIMAX_API_KEY="your-minimax-key"
+export GEMINI_API_KEY="your-gemini-key"
+export OPENAI_API_KEY="your-openai-key"
+
+# Cloud Providers
+export XAI_API_KEY="your-xai-key"
+export ZHIPUAI_API_KEY="your-glm-key"
+export GROQ_API_KEY="your-groq-key"
+export PERPLEXITY_API_KEY="your-perplexity-key"
+export COHERE_API_KEY="your-cohere-key"
+export DEEPSEEK_API_KEY="your-deepseek-key"
+
+# Regional Providers
+export MISTRAL_API_KEY="your-mistral-key"
+export MOONSHOT_API_KEY="your-moonshot-key"
+export QWEN_API_KEY="your-qwen-key"
+
+# Multi-Provider
+export OPENROUTER_API_KEY="your-openrouter-key"
+
+# AI Agents
+export LETTA_API_KEY="your-letta-key"
+```
+
+### API Key Storage Locations
+
+Claude-All automatically saves your API keys securely:
+
+```bash
+~/.minimax_api_key      # MiniMax
+~/.gemini_api_key       # Gemini
+~/.openai_api_key       # OpenAI
+~/.xai_api_key          # xAI/Grok
+~/.zhipuai_api_key      # GLM
+~/.groq_api_key         # Groq
+~/.perplexity_api_key   # Perplexity
+~/.cohere_api_key       # Cohere
+~/.deepseek_api_key     # DeepSeek
+~/.mistral_api_key      # Mistral
+~/.moonshot_api_key     # Moonshot
+~/.qwen_api_key         # Qwen
+~/.openrouter_api_key   # OpenRouter
+~/.letta_api_key        # Letta AI
+```
 
 ### 🌐 Cross-Platform Compatibility
 - ✅ **Linux** (Ubuntu, Debian, CentOS, Arch)
