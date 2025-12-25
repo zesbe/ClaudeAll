@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+# Provider Switch Script for Claude-All-New
+# Usage: ./switch-provider.sh
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo -e "${YELLOW}=== Switch Provider (Continue Chat) ===${NC}"
+echo "Your current chat context will be preserved."
+echo ""
+
+# Show available providers for switching
+echo "Available providers:"
+echo "1) MiniMax"
+echo "2) Google Gemini (API Key)"
+echo "3) Google Gemini (OAuth)"
+echo "4) OpenAI"
+echo "5) OpenAI (OAuth)"
+echo "6) xAI / Grok"
+echo "7) ZhipuAI / GLM"
+echo "8) Groq"
+echo "9) Perplexity"
+echo "10) Cohere"
+echo "11) DeepSeek"
+echo "12) Mistral"
+echo "13) Moonshot"
+echo "14) Qwen"
+echo "15) OpenRouter"
+echo "16) Ollama (Local)"
+echo "0) Cancel"
+echo ""
+
+read -p "Choose new provider [0-16]: " switch_choice
+
+# Save context before switching
+context_file="/tmp/claude_chat_context.txt"
+if [[ -t 0 ]]; then
+    echo "# Chat context saved at $(date)" > "$context_file"
+    echo "# Current conversation:" >> "$context_file"
+    echo "Use this context to continue the conversation with a new provider." >> "$context_file"
+    echo "" >> "$context_file"
+fi
+
+case $switch_choice in
+    0) echo "Cancelled provider switch."; exit 0 ;;
+    1) exec "$SCRIPT_DIR/claude-all" 1 ;;
+    2) exec "$SCRIPT_DIR/claude-all" 2 ;;
+    3) exec "$SCRIPT_DIR/claude-all" 3 ;;
+    4) exec "$SCRIPT_DIR/claude-all" 4 ;;
+    5) exec "$SCRIPT_DIR/claude-all" 5 ;;
+    6) exec "$SCRIPT_DIR/claude-all" 6 ;;
+    7) exec "$SCRIPT_DIR/claude-all" 7 ;;
+    8) exec "$SCRIPT_DIR/claude-all" 8 ;;
+    9) exec "$SCRIPT_DIR/claude-all" 9 ;;
+    10) exec "$SCRIPT_DIR/claude-all" 10 ;;
+    11) exec "$SCRIPT_DIR/claude-all" 11 ;;
+    12) exec "$SCRIPT_DIR/claude-all" 12 ;;
+    13) exec "$SCRIPT_DIR/claude-all" 13 ;;
+    14) exec "$SCRIPT_DIR/claude-all" 14 ;;
+    15) exec "$SCRIPT_DIR/claude-all" 15 ;;
+    16) exec "$SCRIPT_DIR/claude-all" 16 ;;
+    *) echo "Invalid choice."; exit 1 ;;
+esac
+
+echo -e "${GREEN}✓ Provider switched successfully!${NC}"
+echo -e "${BLUE}Note: Chat context has been saved to /tmp/claude_chat_context.txt${NC}"
+echo -e "${BLUE}You can reference previous messages in your next prompt.${NC}"

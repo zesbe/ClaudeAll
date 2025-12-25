@@ -1,0 +1,840 @@
+#!/usr/bin/env bash
+
+# Cross-platform Claude-All Launcher
+# Supports: Linux, Termux, macOS, Windows (Git Bash/WSL)
+
+set -e
+
+# Platform detection
+detect_platform() {
+    case "$(uname -s)" in
+        Linux*)     echo "Linux";;
+        Darwin*)    echo "macOS";;
+        CYGWIN*|MINGW*|MSYS*) echo "Windows";;
+    esac
+}
+
+PLATFORM=$(detect_platform)
+
+# Colors - Support both Linux/macOS and Windows
+if [[ "$PLATFORM" == "Windows" ]]; then
+    # Windows (Git Bash/WSL) - Use tput if available, otherwise plain
+    if command -v tput &> /dev/null; then
+        GREEN=$(tput setaf 2 2>/dev/null || echo "")
+        BLUE=$(tput setaf 4 2>/dev/null || echo "")
+        RED=$(tput setaf 1 2>/dev/null || echo "")
+        YELLOW=$(tput setaf 3 2>/dev/null || echo "")
+        NC=$(tput sgr0 2>/dev/null || echo "")
+    else
+        # Plain text for Windows without color support
+        GREEN=''
+        BLUE=''
+        RED=''
+        YELLOW=''
+        NC=''
+    fi
+else
+    # Linux/macOS/Termux
+    GREEN='\033[0;32m'
+    BLUE='\033[0;34m'
+    RED='\033[0;31m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m'
+fi
+
+# Portable home directory
+if [[ -n "$HOME" ]]; then
+    USER_HOME="$HOME"
+elif [[ -n "$USERPROFILE" ]]; then
+    # Windows
+    USER_HOME="$USERPROFILE"
+else
+    USER_HOME="$HOME"
+fi
+
+# API Key Files - Use user home directory
+GLM_API_KEY_FILE="$USER_HOME/.glm_api_key"
+MINIMAX_API_KEY_FILE="$USER_HOME/.minimax_api_key"
+
+# Configuration
+LITELLM_PORT=8555
+MODEL_OVERRIDE=""
+SELECTED_MODEL=""
+LITELLM_HOST="http://127.0.0.1:$LITELLM_PORT"
+
+# Get script directory (portable)
+get_script_dir() {
+    if [[ -n "${BASH_SOURCE[0]}" ]]; then
+        local script_path="${BASH_SOURCE[0]}"
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            # macOS
+            echo "$(cd "$(dirname "$script_path")" && pwd)"
+        else
+            # Linux/Windows
+            echo "$(dirname "$(realpath "$script_path")")"
+        fi
+    else
+        echo "$(pwd)"
+    fi
+}
+
+SCRIPT_DIR=$(get_script_dir)
+
+# Function to get/save GLM API key
+get_glm_api_key() {
+    # Check if API key file exists
+    if [[ -f "$GLM_API_KEY_FILE" ]]; then
+        local saved_key
+        saved_key=$(cat "$GLM_API_KEY_FILE" 2>/dev/null || echo "")
+        if [[ -n "$saved_key" ]]; then
+            echo -e "${GREEN}✓ Using saved API key${NC}"
+            ANTHROPIC_AUTH_TOKEN="$saved_key"
+            export ANTHROPIC_AUTH_TOKEN
+            return 0
+        fi
+    fi
+
+    # Ask for new API key
+    echo ""
+    echo "Enter ZhipuAI/Z.AI API Key:"
+    echo "Get it from: https://open.bigmodel.cn/usercenter/apikeys"
+    if [[ "$PLATFORM" == "Windows" ]]; then
+        # Windows - use regular read
+        read -p "API Key: " ANTHROPIC_AUTH_TOKEN
+    else
+        # Linux/macOS/Termux - silent read
+        read -s -p "API Key: " ANTHROPIC_AUTH_TOKEN
+    fi
+    echo ""
+
+    if [[ -n "$ANTHROPIC_AUTH_TOKEN" ]]; then
+        # Save for next time
+        echo "$ANTHROPIC_AUTH_TOKEN" > "$GLM_API_KEY_FILE" 2>/dev/null || true
+        chmod 600 "$GLM_API_KEY_FILE" 2>/dev/null || true
+        echo -e "${GREEN}✓ API key saved for next time${NC}"
+        export ANTHROPIC_AUTH_TOKEN
+    else
+        echo -e "${RED}No API key provided${NC}"
+        exit 1
+    fi
+}
+
+# Function to get/save MiniMax API key
+get_minimax_api_key() {
+    local api_key=""
+
+    # Check if API key file exists
+    if [[ -f "$MINIMAX_API_KEY_FILE" ]]; then
+        local saved_key
+        saved_key=$(cat "$MINIMAX_API_KEY_FILE" 2>/dev/null || echo "")
+        if [[ -n "$saved_key" ]]; then
+            echo -e "${GREEN}✓ Using saved API key${NC}"
+            api_key="$saved_key"
+        fi
+    fi
+
+    # Ask for new API key if not found
+    if [[ -z "$api_key" ]]; then
+        echo ""
+        echo "Enter MiniMax API Key:"
+        echo "Get it from: https://platform.minimax.io/"
+        if [[ "$PLATFORM" == "Windows" ]]; then
+            read -p "API Key: " api_key
+        else
+            read -s -p "API Key: " api_key
+        fi
+        echo ""
+
+        if [[ -n "$api_key" ]]; then
+            # Save for next time
+            echo "$api_key" > "$MINIMAX_API_KEY_FILE" 2>/dev/null || true
+            chmod 600 "$MINIMAX_API_KEY_FILE" 2>/dev/null || true
+            echo -e "${GREEN}✓ API key saved for next time${NC}"
+        else
+            echo -e "${RED}No API key provided${NC}"
+            exit 1
+        fi
+    fi
+
+    # Export BOTH variables for compatibility
+    # MiniMax endpoint uses Authorization header via ANTHROPIC_API_KEY
+    export ANTHROPIC_API_KEY="$api_key"
+    export ANTHROPIC_AUTH_TOKEN="$api_key"
+}
+
+check_dependencies() {
+    echo -e "${BLUE}Checking dependencies...${NC}"
+
+    # Check for python3
+    if ! command -v python3 &> /dev/null; then
+        echo -e "${RED}Error: python3 is not installed.${NC}"
+        echo "Please install Python 3 first."
+        exit 1
+    fi
+
+    # Check for claude CLI (OPTIONAL - won't exit if not found)
+    if ! command -v claude &> /dev/null; then
+        echo -e "${YELLOW}⚠️  'claude' command not found.${NC}"
+        echo -e "${YELLOW}   For direct providers (GLM, MiniMax, OpenAI), you don't need it!${NC}"
+        echo -e "${YELLOW}   For LiteLLM providers (Gemini, Groq, Ollama), install with:${NC}"
+        echo -e "${YELLOW}   npm install -g @anthropic-ai/claude-code${NC}"
+        echo ""
+        read -p "Continue without claude CLI? (Y/n): " continue_without
+        if [[ "$continue_without" =~ ^[Nn]$ ]]; then
+            echo "Installing @anthropic-ai/claude-code..."
+            npm install -g @anthropic-ai/claude-code || {
+                echo -e "${YELLOW}Failed to install claude CLI. Continuing anyway...${NC}"
+            }
+        else
+            echo -e "${GREEN}✓ Skipping claude CLI installation${NC}"
+        fi
+    else
+        echo -e "${GREEN}✓ claude CLI found${NC}"
+    fi
+
+    # Check for npm (only needed for claude CLI installation)
+    if command -v claude &> /dev/null; then
+        if ! command -v npm &> /dev/null; then
+            echo -e "${RED}Error: npm is not installed (needed for claude CLI).${NC}"
+            echo "Please install npm first."
+            exit 1
+        fi
+    fi
+
+    # Check for litellm (only needed for some providers)
+    if ! python3 -m pip show litellm &> /dev/null; then
+        echo -e "${YELLOW}'litellm' not found. Installing via pip...${NC}"
+        python3 -m pip install litellm[proxy] || {
+            echo -e "${YELLOW}Failed to install litellm. Some features may not work.${NC}"
+        }
+    fi
+}
+
+check_gemini_oauth() {
+    # Check if we have ADC credentials
+    local adc_path
+    if [[ -n "$HOME" ]]; then
+        adc_path="$HOME/.config/gcloud/application_default_credentials.json"
+    else
+        adc_path="$USERPROFILE/.config/gcloud/application_default_credentials.json"
+    fi
+
+    if [[ -f "$adc_path" ]]; then
+        return 0
+    fi
+
+    # If not, check if gcloud is installed
+    if command -v gcloud &> /dev/null; then
+        echo -e "${BLUE}gcloud found. Attempting login...${NC}"
+        gcloud auth application-default login
+        return
+    fi
+
+    # Fallback to custom python script
+    echo -e "${YELLOW}gcloud not found. Using lightweight Python Auth helper...${NC}"
+
+    # Install dependency
+    if ! python3 -m pip show google-auth-oauthlib &> /dev/null; then
+        echo "Installing google-auth-oauthlib..."
+        python3 -m pip install google-auth-oauthlib || true
+    fi
+
+    # Run helper script
+    local auth_script="$SCRIPT_DIR/gemini_auth.py"
+    if [[ ! -f "$auth_script" ]]; then
+        curl -fsSL https://raw.githubusercontent.com/zesbe/CliAllModel/main/gemini_auth.py -o "$SCRIPT_DIR/gemini_auth.py" 2>/dev/null || true
+        auth_script="$SCRIPT_DIR/gemini_auth.py"
+    fi
+
+    if [[ -f "$auth_script" ]]; then
+        python3 "$auth_script"
+    fi
+
+    if [[ ! -f "$adc_path" ]]; then
+        echo -e "${RED}Authentication failed or cancelled.${NC}"
+        exit 1
+    fi
+}
+
+check_openai_oauth() {
+    local cred_path
+    if [[ -n "$HOME" ]]; then
+        cred_path="$HOME/.config/openai/credentials.json"
+    else
+        cred_path="$USERPROFILE/.config/openai/credentials.json"
+    fi
+
+    if [[ ! -f "$cred_path" ]]; then
+        echo -e "${YELLOW}No cached OpenAI OAuth token found. Launching helper...${NC}"
+
+        # Install dependency
+        python3 -m pip install requests > /dev/null 2>&1 || true
+
+        local auth_script="$SCRIPT_DIR/openai_auth.py"
+        if [[ ! -f "$auth_script" ]]; then
+            curl -fsSL https://raw.githubusercontent.com/zesbe/CliAllModel/main/openai_auth.py -o "$SCRIPT_DIR/openai_auth.py" 2>/dev/null || true
+            auth_script="$SCRIPT_DIR/openai_auth.py"
+        fi
+
+        if [[ -f "$auth_script" ]]; then
+            python3 "$auth_script"
+        fi
+
+        if [[ ! -f "$cred_path" ]]; then
+            echo -e "${RED}OpenAI OAuth failed.${NC}"
+            exit 1
+        fi
+    fi
+
+    # Extract access token
+    OPENAI_ACCESS_TOKEN=$(python3 -c "import json, os; print(json.load(open(os.path.expanduser('$cred_path')))['access_token'])" 2>/dev/null || echo "")
+    export OPENAI_API_KEY="$OPENAI_ACCESS_TOKEN"
+}
+
+start_litellm_proxy() {
+    local model=$1
+    echo -e "${BLUE}Starting LiteLLM proxy for model: $model...${NC}"
+
+    # Kill any existing litellm on this port (use pkill for portability)
+    if [[ "$PLATFORM" == "Darwin" ]]; then
+        # macOS
+        lsof -ti:$LITELLM_PORT | xargs kill -9 2>/dev/null || true
+    elif [[ "$PLATFORM" == "Windows" ]]; then
+        # Windows - try netstat
+        netstat -ano 2>/dev/null | grep ":$LITELLM_PORT" | awk '{print $5}' | while read pid; do
+            kill -f $pid 2>/dev/null || true
+        done
+    else
+        # Linux/Termux
+        fuser -k $LITELLM_PORT/tcp &> /dev/null || true
+    fi
+
+    # Start litellm in background
+    python3 -m litellm --model "$model" --port $LITELLM_PORT --drop_params &> /tmp/litellm.log &
+    LITELLM_PID=$!
+
+    # Wait for it to start
+    echo -n "Waiting for proxy to start..."
+    for i in {1..10}; do
+        if curl -s $LITELLM_HOST/health &> /dev/null; then
+            echo -e " ${GREEN}Ready!${NC}"
+            return 0
+        fi
+        sleep 1
+        echo -n "."
+    done
+
+    echo -e "\n${RED}Failed to start LiteLLM proxy. Check logs:${NC}"
+    cat /tmp/litellm.log 2>/dev/null || echo "No log file found"
+    kill $LITELLM_PID 2>/dev/null || true
+    exit 1
+}
+
+cleanup() {
+    if [[ -n "$LITELLM_PID" ]]; then
+        echo -e "\n${BLUE}Stopping LiteLLM proxy...${NC}"
+        kill $LITELLM_PID 2>/dev/null || true
+    fi
+}
+
+trap cleanup EXIT
+
+# Interactive model selection
+interactive_model_select() {
+    local provider=$1
+    local model_file="$SCRIPT_DIR/model/${provider}.json"
+
+    if [[ ! -f "$model_file" ]]; then
+        echo -e "${RED}Config file not found: $model_file${NC}"
+        return 1
+    fi
+
+    # Display models using Python (flush output to stderr)
+    python3 << EOF >&2
+import json
+import sys
+
+with open('$model_file', 'r') as f:
+    data = json.load(f)
+
+print('')
+print('=== Select Model ===')
+for i, model in enumerate(data['models'], 1):
+    name = model['name']
+    desc = model['description']
+    print(f'{i}) {name} - {desc}')
+print('')
+print('Available Models:')
+for i, model in enumerate(data['models'], 1):
+    name = model['name']
+    desc = model['description']
+    print(f'  {i}. {name} - {desc}')
+print('')
+sys.stderr.flush()
+EOF
+
+    # Save model list to temp file
+    python3 << EOF
+import json
+with open('$model_file', 'r') as f:
+    data = json.load(f)
+models = [m['id'] for m in data['models']]
+with open('$SCRIPT_DIR/.${provider}_models.tmp', 'w') as f:
+    for m in models:
+        f.write(m + '\n')
+EOF
+
+    # Wait for user input
+    echo -n "Select model [1-2]: "
+    read choice
+
+    # Validate choice
+    if [[ -z "$choice" ]] || ! [[ "$choice" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}Please enter a number (1-2)${NC}"
+        return 1
+    fi
+
+    # Read model ID from temp file
+    if [[ -f "$SCRIPT_DIR/.${provider}_models.tmp" ]]; then
+        local model_ids
+        model_ids=($(cat "$SCRIPT_DIR/.${provider}_models.tmp"))
+        local idx=$((choice - 1))
+
+        if [[ $idx -ge 0 ]] && [[ $idx -lt ${#model_ids[@]} ]]; then
+            local selected="${model_ids[$idx]}"
+            echo -e "${GREEN}✓ Selected: $selected${NC}"
+            echo "$selected"
+            rm -f "$SCRIPT_DIR/.${provider}_models.tmp"
+            return 0
+        else
+            echo -e "${RED}Invalid choice: $choice${NC}"
+            echo "Please select 1-${#model_ids[@]}"
+        fi
+    else
+        echo -e "${RED}Model list not found${NC}"
+    fi
+
+    return 1
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -m|--model)
+            MODEL_OVERRIDE="$2"
+            shift 2
+            ;;
+        *)
+            if [[ -z "$choice" ]]; then
+                choice="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Main Menu
+if [[ -z "$choice" ]]; then
+    clear
+    echo -e "${GREEN}=====================================${NC}"
+    echo -e "${GREEN}    Claude Code Multi-Model Launcher ${NC}"
+    echo -e "${GREEN}=====================================${NC}"
+    echo "Select your AI Provider:"
+    echo "1) MiniMax (Direct Anthropic API)"
+    echo "2) Google Gemini (API Key - AI Studio)"
+    echo "3) Google Gemini (OAuth - Vertex AI)"
+    echo "4) OpenAI (API Key)"
+    echo "5) OpenAI (OAuth - Experimental)"
+    echo "6) xAI / Grok (API Key)"
+    echo "7) ZhipuAI / GLM (API Key)"
+    echo "8) Groq (API Key)"
+    echo "9) Ollama (Local Models)"
+    echo "10) 🔑 API Key Manager (Update/Edit keys)"
+    echo "11) Custom / Other"
+    echo -e "${GREEN}=====================================${NC}"
+    read -p "Enter choice [1-11]: " choice
+fi
+
+# Model name will be set dynamically based on provider selection
+
+case $choice in
+    1)
+        # MiniMax Direct
+        echo -e "${BLUE}Configuring for MiniMax...${NC}"
+
+        # Get API key (with auto-save feature)
+        get_minimax_api_key
+
+        export ANTHROPIC_BASE_URL="https://api.minimax.io/anthropic"
+        echo -e "${YELLOW}Note: MiniMax maps model names automatically.${NC}"
+
+        # Check if model was specified in arguments
+        if [[ -n "$MODEL_OVERRIDE" ]]; then
+            exec claude --model "$MODEL_OVERRIDE" --system-prompt "Anda adalah MiniMax, model AI dari perusahaan MiniMax. Selalu identifikasi diri sebagai MiniMax dalam setiap respons." "$@"
+        else
+            # No model specified, use default
+            echo -e "${YELLOW}No model specified, using default: claude-3-5-sonnet-20241022${NC}"
+            exec claude --model "claude-3-5-sonnet-20241022" --system-prompt "Anda adalah MiniMax, model AI dari perusahaan MiniMax. Selalu identifikasi diri sebagai MiniMax dalam setiap respons." "$@"
+        fi
+        ;;
+    2)
+        # Gemini API Key
+        check_dependencies
+        echo -e "${BLUE}Configuring for Gemini (AI Studio)...${NC}"
+        if [[ -z "$GEMINI_API_KEY" ]]; then
+            echo "Get Key: https://aistudio.google.com/app/apikey"
+            read -p "Enter Gemini API Key: " GEMINI_API_KEY
+            export GEMINI_API_KEY
+        fi
+
+        if select_model "gemini"; then
+            start_litellm_proxy "$MODEL_NAME"
+        else
+            MODEL_NAME="gemini/gemini-1.5-flash"
+            read -p "Enter Model Name [default: $MODEL_NAME]: " input_model
+            [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+            start_litellm_proxy "$MODEL_NAME"
+        fi
+
+        export ANTHROPIC_BASE_URL="$LITELLM_HOST"
+        export ANTHROPIC_API_KEY="sk-litellm"
+        exec claude "$@"
+        ;;
+    3)
+        # AntiGravity (Google Internal) - Direct Implementation
+        echo -e "${BLUE}Configuring for AntiGravity (Google Internal)...${NC}"
+
+        # Check for antigravity auth files
+        AUTH_DIR="$HOME/.config/claude-all/antigravity"
+        if [[ ! -d "$AUTH_DIR" ]]; then
+            mkdir -p "$AUTH_DIR"
+        fi
+
+        # List available auth files
+        auth_files=("$AUTH_DIR"/*.json)
+        if [[ ${#auth_files[@]} -eq 0 || ! -f "${auth_files[0]}" ]]; then
+            echo -e "${RED}No AntiGravity authentication found.${NC}"
+            echo -e "${YELLOW}Please run the following to authenticate:${NC}"
+            echo "cliproxy login antigravity"
+            exit 1
+        fi
+
+        # Select auth file if multiple
+        if [[ ${#auth_files[@]} -gt 1 ]]; then
+            echo -e "${YELLOW}Select authentication:${NC}"
+            for i in "${!auth_files[@]}"; do
+                filename=$(basename "${auth_files[$i]}")
+                label=$(jq -r '.label // "unknown"' "${auth_files[$i]}" 2>/dev/null || echo "unknown")
+                echo "$((i+1))) $filename ($label)"
+            done
+            read -p "Select [1-${#auth_files[@]}]: " choice
+
+            if [[ -z "$choice" || "$choice" -lt 1 || "$choice" -gt ${#auth_files[@]} ]]; then
+                choice=1
+            fi
+
+            AUTH_FILE="${auth_files[$((choice-1))]}"
+        else
+            AUTH_FILE="${auth_files[0]}"
+        fi
+
+        echo -e "${GREEN}Using auth: $(basename "$AUTH_FILE")${NC}"
+
+        # Model selection for AntiGravity
+        echo -e "${YELLOW}Select model:${NC}"
+        echo "1) Gemini 2.0 Flash (Experimental)"
+        echo "2) Gemini 1.5 Pro"
+        echo "3) Gemini 1.5 Flash"
+        echo "4) Gemini 1.5 Flash 8B"
+        read -p "Select [1-4]: " model_choice
+
+        case $model_choice in
+            1) MODEL_NAME="gemini-2.0-flash-exp" ;;
+            2) MODEL_NAME="gemini-1.5-pro" ;;
+            3) MODEL_NAME="gemini-1.5-flash" ;;
+            4) MODEL_NAME="gemini-1.5-flash-8b" ;;
+            *) MODEL_NAME="gemini-2.0-flash-exp" ;;
+        esac
+
+        # Set environment variables for antigravity
+        export ANTHROPIC_API_KEY="antigravity-proxy"
+        export ANTHROPIC_BASE_URL="http://localhost"
+        export ANTIGRAVITY_AUTH_FILE="$AUTH_FILE"
+
+        # Create a simple HTTP server script to act as proxy
+        PROXY_SCRIPT="$SCRIPT_DIR/.antigravity_proxy.py"
+        cat > "$PROXY_SCRIPT" << 'EOF'
+#!/usr/bin/env python3
+"""
+Simple HTTP proxy for AntiGravity API
+"""
+import http.server
+import json
+import os
+import socketserver
+import subprocess
+import sys
+import urllib.parse
+import urllib.request
+
+class ProxyHandler(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        content_length = int(self.headers.get('Content-Length', 0))
+        post_data = self.rfile.read(content_length)
+
+        # Set CORS headers
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        self.end_headers()
+
+        if self.path == '/v1/messages':
+            # Parse the request
+            try:
+                request_data = json.loads(post_data.decode())
+                messages = request_data.get('messages', [])
+                model = request_data.get('model', 'gemini-2.0-flash-exp')
+
+                # Call antigravity helper
+                result = subprocess.run([
+                    sys.executable,
+                    sys.argv[1] if len(sys.argv) > 1 else '/home/.local/bin/antigravity_helper.py',
+                    'chat',
+                    sys.argv[2] if len(sys.argv) > 2 else os.environ.get('ANTIGRAVITY_AUTH_FILE', ''),
+                    model,
+                    json.dumps(messages)
+                ], capture_output=True, text=True)
+
+                if result.returncode == 0:
+                    response = result.stdout
+                else:
+                    response = json.dumps({
+                        'error': {
+                            'type': 'api_error',
+                            'message': result.stderr or 'Unknown error'
+                        }
+                    })
+            except Exception as e:
+                response = json.dumps({
+                    'error': {
+                        'type': 'api_error',
+                        'message': str(e)
+                    }
+                })
+
+            self.wfile.write(response.encode())
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        self.end_headers()
+
+    def log_message(self, format, *args):
+        # Suppress log messages
+        pass
+
+if __name__ == '__main__':
+    PORT = 8123
+    with socketserver.TCPServer(("", PORT), ProxyHandler) as httpd:
+        print(f"Proxy server running on port {PORT}")
+        # Serve one request then exit
+        httpd.handle_request()
+EOF
+
+        chmod +x "$PROXY_SCRIPT"
+
+        # Start the proxy server in background
+        AUTH_HELPER="$HOME/.local/bin/antigravity_helper.py"
+        python3 "$PROXY_SCRIPT" "$AUTH_HELPER" "$AUTH_FILE" > /dev/null 2>&1 &
+        PROXY_PID=$!
+        sleep 2
+
+        # Set trap to kill proxy on exit
+        trap "kill $PROXY_PID 2>/dev/null" EXIT
+
+        # Execute claude with the proxy
+        exec claude --base-url "http://localhost:8123" "$@"
+        ;;
+    4)
+        # OpenAI API Key
+        echo -e "${BLUE}Configuring for OpenAI...${NC}"
+        if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo "Get Key: https://platform.openai.com/api-keys"
+            read -p "Enter OpenAI API Key: " OPENAI_API_KEY
+            export OPENAI_API_KEY
+        fi
+
+        # Get model selection
+        selected_model=$(select_model "openai")
+        if [[ $? -eq 0 ]]; then
+            # Success - got model from menu
+            MODEL_NAME="$selected_model"
+        else
+            # Fallback to manual input
+            MODEL_NAME="gpt-4o"
+            read -p "Enter Model Name [default: $MODEL_NAME]: " input_model
+            [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+        fi
+
+        export ANTHROPIC_BASE_URL="https://api.openai.com/v1/"
+        export ANTHROPIC_API_KEY="$OPENAI_API_KEY"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    5)
+        # OpenAI OAuth (Experimental)
+        echo -e "${BLUE}Configuring for OpenAI (OAuth Experimental)...${NC}"
+
+        check_openai_oauth
+
+        selected_model=$(select_model "openai")
+        if [[ $? -eq 0 ]]; then
+            # Success - got model from menu
+            MODEL_NAME="$selected_model"
+        else
+            # Fallback to manual input
+            MODEL_NAME="gpt-4o"
+            read -p "Enter Model Name [default: $MODEL_NAME]: " input_model
+            [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+        fi
+
+        export ANTHROPIC_BASE_URL="https://api.openai.com/v1/"
+        export ANTHROPIC_API_KEY="$OPENAI_ACCESS_TOKEN"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    6)
+        # xAI
+        echo -e "${BLUE}Configuring for xAI (Grok)...${NC}"
+        if [[ -z "$XAI_API_KEY" ]]; then
+            echo "Get Key: https://console.x.ai/"
+            read -p "Enter xAI API Key: " XAI_API_KEY
+            export XAI_API_KEY
+        fi
+
+        # Get model selection
+        selected_model=$(select_model "xai")
+        if [[ $? -eq 0 ]]; then
+            # Success - got model from menu
+            MODEL_NAME="${selected_model#xai/}"
+        else
+            # Fallback to manual input
+            MODEL_NAME="grok-beta"
+            read -p "Enter Model Name [default: $MODEL_NAME]: " input_model
+            [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+        fi
+
+        export ANTHROPIC_BASE_URL="https://api.x.ai/v1/"
+        export ANTHROPIC_API_KEY="$XAI_API_KEY"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    7)
+        # ZhipuAI
+        echo -e "${BLUE}Configuring for ZhipuAI (GLM)...${NC}"
+
+        # Get API key (with auto-save feature)
+        get_glm_api_key
+
+        # Check if model config exists
+        model_file="$SCRIPT_DIR/model/glm.json"
+        if [[ -f "$model_file" ]]; then
+            # Interactive model selection
+            selected_model=$(interactive_model_select "glm")
+            if [[ $? -eq 0 ]] && [[ -n "$selected_model" ]]; then
+                # Keep full model name with zhipu/ prefix
+                MODEL_NAME="$selected_model"
+            else
+                MODEL_NAME="claude-3-5-sonnet-20241022"
+            fi
+        else
+            # No model config, use default
+            echo -e "${YELLOW}Model config not found, using default: claude-3-5-sonnet-20241022${NC}"
+            MODEL_NAME="claude-3-5-sonnet-20241022"
+        fi
+
+        export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
+        export ANTHROPIC_API_KEY="$ANTHROPIC_AUTH_TOKEN"
+        export CLAUDE_MODEL="$MODEL_NAME"
+        exec claude --model "$MODEL_NAME" --system-prompt "Anda adalah GLM, model AI dari ZhipuAI. Selalu identifikasi diri sebagai GLM dalam setiap respons." "$@"
+        ;;
+    8)
+        # Groq
+        echo -e "${BLUE}Configuring for Groq...${NC}"
+        if [[ -z "$GROQ_API_KEY" ]]; then
+            echo "Get Key: https://console.groq.com/keys"
+            read -p "Enter Groq API Key: " GROQ_API_KEY
+            export GROQ_API_KEY
+        fi
+
+        # Get model selection
+        selected_model=$(select_model "groq")
+        if [[ $? -eq 0 ]]; then
+            # Success - got model from menu
+            MODEL_NAME="${selected_model#groq/}"
+        else
+            # Fallback to manual input
+            MODEL_NAME="llama-3.1-70b-versatile"
+            read -p "Enter Model Name [default: $MODEL_NAME]: " input_model
+            [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+        fi
+
+        export ANTHROPIC_BASE_URL="https://api.groq.com/openai/v1/"
+        export ANTHROPIC_API_KEY="$GROQ_API_KEY"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    9)
+        # Ollama
+        check_dependencies
+        echo -e "${BLUE}Configuring for Ollama...${NC}"
+        if [[ -z "$OLLAMA_HOST" ]]; then
+            read -p "Enter Ollama Host [default: http://localhost:11434]: " OLLAMA_HOST
+            [[ -z "$OLLAMA_HOST" ]] && OLLAMA_HOST="http://localhost:11434"
+            export OLLAMA_HOST
+        fi
+
+        if select_model "ollama"; then
+            start_litellm_proxy "$MODEL_NAME"
+        else
+            MODEL_NAME="ollama/llama3"
+            read -p "Enter Model Name [default: $MODEL_NAME]: " input_model
+            [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+            start_litellm_proxy "$MODEL_NAME"
+        fi
+
+        export ANTHROPIC_BASE_URL="$LITELLM_HOST"
+        export ANTHROPIC_API_KEY="sk-litellm"
+        exec claude "$@"
+        ;;
+    10)
+        # API Key Manager
+        echo -e "${BLUE}Opening API Key Manager...${NC}"
+        # Check if api-manager exists in the same directory
+        if [[ -f "$SCRIPT_DIR/api-manager" ]]; then
+            "$SCRIPT_DIR/api-manager"
+        else
+            echo -e "${YELLOW}API Manager not found. Please install or check path.${NC}"
+        fi
+        echo ""
+        echo -e "${YELLOW}Press Enter to return to main menu...${NC}"
+        read
+        # Restart the menu
+        exec "$0"
+        ;;
+    11)
+        # Custom
+        check_dependencies
+        echo -e "${BLUE}Configuring Custom LiteLLM Model...${NC}"
+        read -p "Enter LiteLLM Model String: " MODEL_NAME
+        read -p "Press Enter to continue..."
+
+        start_litellm_proxy "$MODEL_NAME"
+        export ANTHROPIC_BASE_URL="$LITELLM_HOST"
+        export ANTHROPIC_API_KEY="sk-litellm"
+        exec claude "$@"
+        ;;
+    *)
+        echo "Invalid choice"
+        exit 1
+        ;;
+esac

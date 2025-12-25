@@ -1,0 +1,56 @@
+{
+  "name": "Google Gemini",
+  "description": "Google Gemini AI Models",
+  "models": [
+    {
+      "id": "gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash",
+      "description": "Latest generation model, ultra-fast response"
+    },
+    {
+      "id": "gemini-2.5-pro",
+      "name": "Gemini 2.5 Pro",
+      "description": "Enhanced capabilities model"
+    },
+    {
+      "id": "gemini-2.0-flash-exp",
+      "name": "Gemini 2.0 Flash Experimental",
+      "description": "Latest experimental model (VERIFIED WORKING)"
+    },
+    {
+      "id": "gemini-2.0-flash",
+      "name": "Gemini 2.0 Flash",
+      "description": "Stable version of 2.0 Flash"
+    },
+    {
+      "id": "gemini-3-pro-preview",
+      "name": "Gemini 3 Pro Preview",
+      "description": "Preview of Gemini 3 Pro"
+    },
+    {
+      "id": "gemini-flash-latest",
+      "name": "Gemini Flash Latest",
+      "description": "Latest stable Flash model"
+    },
+    {
+      "id": "gemini-pro-latest",
+      "name": "Gemini Pro Latest",
+      "description": "Latest stable Pro model"
+    },
+    {
+      "id": "gemini-2.0-flash-lite",
+      "name": "Gemini 2.0 Flash Lite",
+      "description": "Lighter version of 2.0 Flash"
+    },
+    {
+      "id": "gemini-2.5-flash-preview-09-2025",
+      "name": "Gemini 2.5 Flash Preview",
+      "description": "Preview version of 2.5 Flash"
+    },
+    {
+      "id": "gemini-2.5-flash-lite",
+      "name": "Gemini 2.5 Flash Lite",
+      "description": "Light version of 2.5 Flash"
+    }
+  ]
+}

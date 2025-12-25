@@ -1,0 +1,36 @@
+{
+  "name": "Ollama Local",
+  "description": "Ollama Local Models",
+  "models": [
+    {
+      "id": "ollama/llama3",
+      "name": "Llama 3",
+      "description": "Meta Llama 3 8B"
+    },
+    {
+      "id": "ollama/llama3.1",
+      "name": "Llama 3.1",
+      "description": "Meta Llama 3.1 models"
+    },
+    {
+      "id": "ollama/mistral",
+      "name": "Mistral",
+      "description": "Mistral 7B model"
+    },
+    {
+      "id": "ollama/codellama",
+      "name": "Code Llama",
+      "description": "Code-specialized Llama"
+    },
+    {
+      "id": "ollama/phi3",
+      "name": "Phi-3",
+      "description": "Microsoft Phi-3 models"
+    },
+    {
+      "id": "ollama/qwen2",
+      "name": "Qwen2",
+      "description": "Alibaba Qwen2 models"
+    }
+  ]
+}

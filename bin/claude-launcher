@@ -1,0 +1,19 @@
+#!/usr/bin/env node
+
+/**
+ * 🤖 Claude-All AI Launcher - NPM Binary
+ */
+
+const path = require('path');
+
+// Launch the main claude-all script
+const claudeAllScript = path.join(__dirname, '..', 'claude-all');
+const { spawn } = require('child_process');
+
+const child = spawn(claudeAllScript, process.argv.slice(2), {
+    stdio: 'inherit'
+});
+
+child.on('exit', (code) => {
+    process.exit(code);
+});

@@ -1,0 +1,41 @@
+{
+  "name": "xAI Grok",
+  "description": "xAI Grok Models - API Key from https://console.x.ai/",
+  "models": [
+    {
+      "id": "grok-4-1-fast-reasoning",
+      "name": "Grok 4.1 Fast Reasoning",
+      "description": "Grok 4.1 with fast reasoning capabilities ✅"
+    },
+    {
+      "id": "grok-4-1-fast",
+      "name": "Grok 4.1 Fast",
+      "description": "Grok 4.1 Fast model (Alias) ✅"
+    },
+    {
+      "id": "grok-4-1-fast-reasoning-lates",
+      "name": "Grok 4.1 Fast Reasoning (Latest)",
+      "description": "Latest Grok 4.1 Fast Reasoning model ✅"
+    },
+    {
+      "id": "grok-beta",
+      "name": "Grok Beta",
+      "description": "Latest Grok model with reasoning capabilities ✅"
+    },
+    {
+      "id": "grok-2-mini",
+      "name": "Grok 2 Mini",
+      "description": "Lightweight Grok model ✅"
+    },
+    {
+      "id": "grok-2",
+      "name": "Grok 2",
+      "description": "Standard Grok 2 model ✅"
+    },
+    {
+      "id": "grok-vision-beta",
+      "name": "Grok Vision Beta",
+      "description": "Grok model with image understanding ✅"
+    }
+  ]
+}

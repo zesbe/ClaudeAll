@@ -1,0 +1,7 @@
+{
+  "provider_name": "Moonshot",
+  "description": "AI Provider - moonshot",
+  "api_base": "https://api.moonshot.cn/v1",
+  "model": "moonshot-v1-8k",
+  "api_key": "your-api-key-here"
+}

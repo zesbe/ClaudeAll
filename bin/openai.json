@@ -1,0 +1,46 @@
+{
+  "name": "OpenAI",
+  "description": "OpenAI GPT & o1 Models",
+  "models": [
+    {
+      "id": "o1-preview",
+      "name": "o1 Preview",
+      "description": "Reasoning model for complex tasks"
+    },
+    {
+      "id": "o1-mini",
+      "name": "o1 Mini",
+      "description": "Smaller reasoning model"
+    },
+    {
+      "id": "gpt-4o",
+      "name": "GPT-4o",
+      "description": "Latest flagship model, multimodal"
+    },
+    {
+      "id": "gpt-4o-mini",
+      "name": "GPT-4o Mini",
+      "description": "Faster, cheaper multimodal model"
+    },
+    {
+      "id": "gpt-4-turbo",
+      "name": "GPT-4 Turbo",
+      "description": "High intelligence, fast response"
+    },
+    {
+      "id": "gpt-4o-2024-08-06",
+      "name": "GPT-4o (Aug 2024)",
+      "description": "Latest GPT-4o version"
+    },
+    {
+      "id": "gpt-4",
+      "name": "GPT-4",
+      "description": "High intelligence model"
+    },
+    {
+      "id": "gpt-3.5-turbo",
+      "name": "GPT-3.5 Turbo",
+      "description": "Fast, efficient model"
+    }
+  ]
+}

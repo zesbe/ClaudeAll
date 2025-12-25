@@ -1,0 +1,17 @@
+node_modules/
+*.log
+.DS_Store
+.env
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cache/
+tmp/
+temp/
+dist/
+build/
+coverage/
+.npm/
+.yarn/

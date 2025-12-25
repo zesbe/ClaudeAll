@@ -1,0 +1,12 @@
+{
+    "provider_name": "Perplexity AI",
+    "description": "Search-powered AI with real-time web search",
+    "api_key": "SET_YOUR_PERPLEXITY_API_KEY_HERE",
+    "api_base": "https://api.perplexity.ai/",
+    "model": "sonar-pro",
+    "notes": "✅ API key tested successfully! Use model: perplexity/sonar-pro",
+    "test_date": "2025-12-14",
+    "test_result": "SUCCESS - Working via direct API call",
+    "available_models": ["sonar", "sonar-pro", "sonar-reasoning", "sonar-reasoning-pro", "sonar-deep-research"],
+    "usage": "Enter: perplexity/sonar-pro in custom model option"
+}

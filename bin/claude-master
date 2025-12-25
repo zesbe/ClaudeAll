@@ -1,0 +1,15 @@
+#!/bin/bash
+# Wrapper for claude_master.py
+
+# Resolve directory of this script
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+PYTHON_SCRIPT="$SCRIPT_DIR/claude_master.py"
+
+# Check if python3 exists
+if ! command -v python3 &> /dev/null; then
+    echo "Error: python3 is required."
+    exit 1
+fi
+
+# Run the python script
+exec python3 "$PYTHON_SCRIPT" "$@"

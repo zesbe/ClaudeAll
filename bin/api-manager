@@ -1,0 +1,340 @@
+#!/usr/bin/env bash
+
+# Universal API Key Manager for All Providers
+# Cross-platform: Linux, Termux, macOS, Windows (Git Bash/WSL)
+# Usage: api-manager
+
+# Platform detection
+detect_platform() {
+    case "$(uname -s)" in
+        Linux*)     echo "Linux";;
+        Darwin*)    echo "macOS";;
+        CYGWIN*|MINGW*|MSYS*) echo "Windows";;
+        *)          echo "Linux";;
+    esac
+}
+
+PLATFORM=$(detect_platform)
+
+# Colors - Support both Linux/macOS and Windows
+if [[ "$PLATFORM" == "Windows" ]]; then
+    if command -v tput &> /dev/null; then
+        GREEN=$(tput setaf 2 2>/dev/null || echo "")
+        BLUE=$(tput setaf 4 2>/dev/null || echo "")
+        RED=$(tput setaf 1 2>/dev/null || echo "")
+        YELLOW=$(tput setaf 3 2>/dev/null || echo "")
+        NC=$(tput sgr0 2>/dev/null || echo "")
+    else
+        GREEN=''
+        BLUE=''
+        RED=''
+        YELLOW=''
+        NC=''
+    fi
+else
+    GREEN='\033[0;32m'
+    BLUE='\033[0;34m'
+    RED='\033[0;31m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m'
+fi
+
+# Portable home directory
+if [[ -n "$HOME" ]]; then
+    USER_HOME="$HOME"
+elif [[ -n "$USERPROFILE" ]]; then
+    USER_HOME="$USERPROFILE"
+else
+    USER_HOME="$HOME"
+fi
+
+echo -e "${GREEN}🔑 Universal API Key Manager${NC}"
+echo "================================="
+echo ""
+echo "Select provider to manage:"
+echo ""
+echo "  1) ZhipuAI / GLM"
+echo "  2) MiniMax"
+echo "  3) OpenAI"
+echo "  4) Google Gemini"
+echo "  5) xAI / Grok"
+echo "  6) Groq"
+echo "  7) View all saved keys"
+echo "  8) Exit"
+echo ""
+
+read -p "Select [1-8]: " choice
+
+case $choice in
+    1)
+        # GLM
+        KEY_FILE="$USER_HOME/.glm_api_key"
+        echo ""
+        echo -e "${BLUE}🔑 GLM API Key${NC}"
+        echo "=============="
+        if [[ -f "$KEY_FILE" ]]; then
+            echo -e "Status: ${GREEN}✓ Saved${NC}"
+            echo "Key: $(cat "$KEY_FILE" 2>/dev/null | cut -c1-12 2>/dev/null || echo "error")..."
+        else
+            echo -e "Status: ${RED}✗ Not saved${NC}"
+        fi
+        echo ""
+        echo "[1] Update GLM key"
+        echo "[2] Remove GLM key"
+        echo "[3] Back"
+        read -p "Choice: " subchoice
+        case $subchoice in
+            1)
+                echo ""
+                echo "Get key from: https://open.bigmodel.cn/usercenter/apikeys"
+                if [[ "$PLATFORM" == "Windows" ]]; then
+                    read -p "Paste GLM API key: " new_key
+                else
+                    read -s -p "Paste GLM API key: " new_key
+                    echo ""
+                fi
+                if [[ -n "$new_key" ]]; then
+                    echo "$new_key" > "$KEY_FILE" 2>/dev/null || true
+                    chmod 600 "$KEY_FILE" 2>/dev/null || true
+                    echo ""
+                    echo -e "${GREEN}✓ GLM API key saved!${NC}"
+                fi
+                ;;
+            2)
+                rm -f "$KEY_FILE" 2>/dev/null || true
+                echo -e "${GREEN}✓ GLM API key removed${NC}"
+                ;;
+        esac
+        ;;
+    2)
+        # MiniMax
+        KEY_FILE="$USER_HOME/.minimax_api_key"
+        echo ""
+        echo -e "${BLUE}🤖 MiniMax API Key${NC}"
+        echo "================="
+        if [[ -f "$KEY_FILE" ]]; then
+            echo -e "Status: ${GREEN}✓ Saved${NC}"
+            echo "Key: $(cat "$KEY_FILE" 2>/dev/null | cut -c1-12 2>/dev/null || echo "error")..."
+        else
+            echo -e "Status: ${RED}✗ Not saved${NC}"
+        fi
+        echo ""
+        echo "[1] Update MiniMax key"
+        echo "[2] Remove MiniMax key"
+        echo "[3] Back"
+        read -p "Choice: " subchoice
+        case $subchoice in
+            1)
+                echo ""
+                echo "Get key from: https://platform.minimax.io/"
+                if [[ "$PLATFORM" == "Windows" ]]; then
+                    read -p "Paste MiniMax API key: " new_key
+                else
+                    read -s -p "Paste MiniMax API key: " new_key
+                    echo ""
+                fi
+                if [[ -n "$new_key" ]]; then
+                    echo "$new_key" > "$KEY_FILE" 2>/dev/null || true
+                    chmod 600 "$KEY_FILE" 2>/dev/null || true
+                    echo ""
+                    echo -e "${GREEN}✓ MiniMax API key saved!${NC}"
+                fi
+                ;;
+            2)
+                rm -f "$KEY_FILE" 2>/dev/null || true
+                echo -e "${GREEN}✓ MiniMax API key removed${NC}"
+                ;;
+        esac
+        ;;
+    3)
+        # OpenAI
+        KEY_FILE="$USER_HOME/.openai_api_key"
+        echo ""
+        echo -e "${BLUE}🟢 OpenAI API Key${NC}"
+        echo "================="
+        if [[ -f "$KEY_FILE" ]]; then
+            echo -e "Status: ${GREEN}✓ Saved${NC}"
+            echo "Key: $(cat "$KEY_FILE" 2>/dev/null | cut -c1-12 2>/dev/null || echo "error")..."
+        else
+            echo -e "Status: ${RED}✗ Not saved${NC}"
+        fi
+        echo ""
+        echo "[1] Update OpenAI key"
+        echo "[2] Remove OpenAI key"
+        echo "[3] Back"
+        read -p "Choice: " subchoice
+        case $subchoice in
+            1)
+                echo ""
+                echo "Get key from: https://platform.openai.com/api-keys"
+                if [[ "$PLATFORM" == "Windows" ]]; then
+                    read -p "Paste OpenAI API key: " new_key
+                else
+                    read -s -p "Paste OpenAI API key: " new_key
+                    echo ""
+                fi
+                if [[ -n "$new_key" ]]; then
+                    echo "$new_key" > "$KEY_FILE" 2>/dev/null || true
+                    chmod 600 "$KEY_FILE" 2>/dev/null || true
+                    echo ""
+                    echo -e "${GREEN}✓ OpenAI API key saved!${NC}"
+                fi
+                ;;
+            2)
+                rm -f "$KEY_FILE" 2>/dev/null || true
+                echo -e "${GREEN}✓ OpenAI API key removed${NC}"
+                ;;
+        esac
+        ;;
+    4)
+        # Gemini
+        KEY_FILE="$USER_HOME/.gemini_api_key"
+        echo ""
+        echo -e "${BLUE}🔵 Google Gemini API Key${NC}"
+        echo "========================"
+        if [[ -f "$KEY_FILE" ]]; then
+            echo -e "Status: ${GREEN}✓ Saved${NC}"
+            echo "Key: $(cat "$KEY_FILE" 2>/dev/null | cut -c1-12 2>/dev/null || echo "error")..."
+        else
+            echo -e "Status: ${RED}✗ Not saved${NC}"
+        fi
+        echo ""
+        echo "[1] Update Gemini key"
+        echo "[2] Remove Gemini key"
+        echo "[3] Back"
+        read -p "Choice: " subchoice
+        case $subchoice in
+            1)
+                echo ""
+                echo "Get key from: https://aistudio.google.com/app/apikey"
+                if [[ "$PLATFORM" == "Windows" ]]; then
+                    read -p "Paste Gemini API key: " new_key
+                else
+                    read -s -p "Paste Gemini API key: " new_key
+                    echo ""
+                fi
+                if [[ -n "$new_key" ]]; then
+                    echo "$new_key" > "$KEY_FILE" 2>/dev/null || true
+                    chmod 600 "$KEY_FILE" 2>/dev/null || true
+                    echo ""
+                    echo -e "${GREEN}✓ Gemini API key saved!${NC}"
+                fi
+                ;;
+            2)
+                rm -f "$KEY_FILE" 2>/dev/null || true
+                echo -e "${GREEN}✓ Gemini API key removed${NC}"
+                ;;
+        esac
+        ;;
+    5)
+        # xAI
+        KEY_FILE="$USER_HOME/.xai_api_key"
+        echo ""
+        echo -e "${BLUE}⚡ xAI / Grok API Key${NC}"
+        echo "======================"
+        if [[ -f "$KEY_FILE" ]]; then
+            echo -e "Status: ${GREEN}✓ Saved${NC}"
+            echo "Key: $(cat "$KEY_FILE" 2>/dev/null | cut -c1-12 2>/dev/null || echo "error")..."
+        else
+            echo -e "Status: ${RED}✗ Not saved${NC}"
+        fi
+        echo ""
+        echo "[1] Update xAI key"
+        echo "[2] Remove xAI key"
+        echo "[3] Back"
+        read -p "Choice: " subchoice
+        case $subchoice in
+            1)
+                echo ""
+                echo "Get key from: https://console.x.ai/"
+                if [[ "$PLATFORM" == "Windows" ]]; then
+                    read -p "Paste xAI API key: " new_key
+                else
+                    read -s -p "Paste xAI API key: " new_key
+                    echo ""
+                fi
+                if [[ -n "$new_key" ]]; then
+                    echo "$new_key" > "$KEY_FILE" 2>/dev/null || true
+                    chmod 600 "$KEY_FILE" 2>/dev/null || true
+                    echo ""
+                    echo -e "${GREEN}✓ xAI API key saved!${NC}"
+                fi
+                ;;
+            2)
+                rm -f "$KEY_FILE" 2>/dev/null || true
+                echo -e "${GREEN}✓ xAI API key removed${NC}"
+                ;;
+        esac
+        ;;
+    6)
+        # Groq
+        KEY_FILE="$USER_HOME/.groq_api_key"
+        echo ""
+        echo -e "${BLUE}🟠 Groq API Key${NC}"
+        echo "==============="
+        if [[ -f "$KEY_FILE" ]]; then
+            echo -e "Status: ${GREEN}✓ Saved${NC}"
+            echo "Key: $(cat "$KEY_FILE" 2>/dev/null | cut -c1-12 2>/dev/null || echo "error")..."
+        else
+            echo -e "Status: ${RED}✗ Not saved${NC}"
+        fi
+        echo ""
+        echo "[1] Update Groq key"
+        echo "[2] Remove Groq key"
+        echo "[3] Back"
+        read -p "Choice: " subchoice
+        case $subchoice in
+            1)
+                echo ""
+                echo "Get key from: https://console.groq.com/keys"
+                if [[ "$PLATFORM" == "Windows" ]]; then
+                    read -p "Paste Groq API key: " new_key
+                else
+                    read -s -p "Paste Groq API key: " new_key
+                    echo ""
+                fi
+                if [[ -n "$new_key" ]]; then
+                    echo "$new_key" > "$KEY_FILE" 2>/dev/null || true
+                    chmod 600 "$KEY_FILE" 2>/dev/null || true
+                    echo ""
+                    echo -e "${GREEN}✓ Groq API key saved!${NC}"
+                fi
+                ;;
+            2)
+                rm -f "$KEY_FILE" 2>/dev/null || true
+                echo -e "${GREEN}✓ Groq API key removed${NC}"
+                ;;
+        esac
+        ;;
+    7)
+        # View all
+        echo ""
+        echo -e "${BLUE}📋 All Saved API Keys${NC}"
+        echo "====================="
+        echo ""
+
+        for provider in GLM MiniMax OpenAI Gemini "xAI" Groq; do
+            case "$provider" in
+                GLM) FILE="$USER_HOME/.glm_api_key" ;;
+                MiniMax) FILE="$USER_HOME/.minimax_api_key" ;;
+                OpenAI) FILE="$USER_HOME/.openai_api_key" ;;
+                Gemini) FILE="$USER_HOME/.gemini_api_key" ;;
+                "xAI") FILE="$USER_HOME/.xai_api_key" ;;
+                Groq) FILE="$USER_HOME/.groq_api_key" ;;
+            esac
+
+            if [[ -f "$FILE" ]]; then
+                echo -e "${GREEN}✓${NC} $provider: $(cat "$FILE" 2>/dev/null | cut -c1-12 2>/dev/null || echo "error")..."
+            else
+                echo -e "${RED}✗${NC} $provider: Not saved"
+            fi
+        done
+        echo ""
+        ;;
+    8)
+        echo "Bye!"
+        ;;
+    *)
+        echo -e "${RED}Invalid choice${NC}"
+        ;;
+esac

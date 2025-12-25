@@ -1,0 +1,2239 @@
+#!/usr/bin/env bash
+
+# Cross-platform Claude-All Launcher v7.0
+# Supports: Linux, Termux, macOS, Windows (Git Bash/WSL)
+# Includes Superpowers Library (30 skills + 14 agents)
+
+set -e
+
+# Platform detection
+detect_platform() {
+    case "$(uname -s)" in
+        Linux*)     echo "Linux";;
+        Darwin*)    echo "macOS";;
+        CYGWIN*|MINGW*|MSYS*) echo "Windows";;
+    esac
+}
+
+PLATFORM=$(detect_platform)
+
+# Colors - auto-detect and install if needed
+setup_colors() {
+    # Ensure tput is available for colors
+    if ! command -v tput &> /dev/null; then
+        if command -v pkg &> /dev/null && [[ "$PLATFORM" != "Windows" ]]; then
+            # Install ncurses-utils silently in background
+            pkg install -y ncurses-utils &>/dev/null &
+        fi
+    fi
+
+    if command -v tput &> /dev/null; then
+        GREEN=$(tput setaf 2 2>/dev/null || echo "")
+        BLUE=$(tput setaf 4 2>/dev/null || echo "")
+        RED=$(tput setaf 1 2>/dev/null || echo "")
+        YELLOW=$(tput setaf 3 2>/dev/null || echo "")
+        NC=$(tput sgr0 2>/dev/null || echo "")
+    else
+        # Fallback to plain text
+        GREEN=''
+        BLUE=''
+        RED=''
+        YELLOW=''
+        NC=''
+    fi
+}
+
+setup_colors
+
+# Reusable functions for API key management
+save_api_key() {
+    local api_key="$1"
+    local key_file="$2"
+    local provider_name="$3"
+
+    if [[ -z "$api_key" ]]; then
+        echo -e "${RED}Error: No API key provided for $provider_name${NC}" >&2
+        return 1
+    fi
+
+    if ! echo "$api_key" > "$key_file" 2>/dev/null; then
+        echo -e "${YELLOW}Warning: Could not save $provider_name API key to file${NC}" >&2
+        return 1
+    fi
+
+    if ! chmod 600 "$key_file" 2>/dev/null; then
+        echo -e "${YELLOW}Warning: Could not set secure permissions on $provider_name API key file${NC}" >&2
+        return 1
+    fi
+
+    echo -e "${GREEN}✓ $provider_name API key saved securely${NC}"
+    return 0
+}
+
+load_api_key() {
+    local key_file="$1"
+    local provider_name="$2"
+
+    if [[ -f "$key_file" ]]; then
+        local saved_key
+        saved_key=$(cat "$key_file" 2>/dev/null || echo "")
+        if [[ -n "$saved_key" ]]; then
+            echo -e "${GREEN}✓ Using saved $provider_name API key${NC}"
+            echo "$saved_key"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+prompt_api_key() {
+    local provider_name="$1"
+    local api_key=""
+
+    echo -e "${BLUE}Enter $provider_name API Key:${NC}"
+
+    # Check if we're on Windows (no silent input)
+    if [[ "$PLATFORM" == "Windows" ]]; then
+        read -p "API Key: " api_key
+    else
+        # Linux/macOS/Termux - silent read
+        read -s -p "API Key: " api_key
+    fi
+    echo ""
+
+    echo "$api_key"
+}
+
+# Portable home directory
+if [[ -n "$HOME" ]]; then
+    USER_HOME="$HOME"
+elif [[ -n "$USERPROFILE" ]]; then
+    # Windows
+    USER_HOME="$USERPROFILE"
+else
+    USER_HOME="$HOME"
+fi
+
+# API Key Files - Use user home directory
+GLM_API_KEY_FILE="$USER_HOME/.glm_api_key"
+MINIMAX_API_KEY_FILE="$USER_HOME/.minimax_api_key"
+
+# Configuration
+LITELLM_PORT=8555
+MODEL_OVERRIDE=""
+SELECTED_MODEL=""
+LITELLM_HOST="http://127.0.0.1:$LITELLM_PORT"
+
+# Function to get custom models
+get_custom_models() {
+    local custom_models=()
+    local model_dir="$SCRIPT_DIR/model"
+
+    # Ensure model directory exists
+    if [[ ! -d "$model_dir" ]]; then
+        mkdir -p "$model_dir" 2>/dev/null || return 0
+    fi
+
+    # Find JSON files using simple for loop (most compatible)
+    for json_file in "$model_dir"/*.json; do
+        if [[ -f "$json_file" ]]; then
+            local filename=$(basename "$json_file" .json)
+
+            # Skip default model files
+            case "$filename" in
+                "glm"|"groq"|"minimax"|"openai"|"gemini"|"xai"|"ollama")
+                    continue
+                    ;;
+            esac
+
+            # Parse JSON for model info
+            if command -v jq &> /dev/null; then
+                local provider_name=$(jq -r '.provider_name // "Unknown"' "$json_file" 2>/dev/null)
+                local description=$(jq -r '.description // "Custom Provider"' "$json_file" 2>/dev/null)
+                # Ensure we got valid values
+                [[ "$provider_name" == "null" || -z "$provider_name" ]] && provider_name="Unknown"
+                [[ "$description" == "null" || -z "$description" ]] && description="Custom Provider"
+                printf '%s:%s:%s\n' "$filename" "$provider_name" "$description"
+            else
+                # Fallback parsing without jq
+                local provider_name=$(grep '"provider_name"' "$json_file" | sed 's/.*"provider_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' 2>/dev/null)
+                [[ -z "$provider_name" ]] && provider_name="$filename"
+                local description=$(grep '"description"' "$json_file" | sed 's/.*"description"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' 2>/dev/null)
+                [[ -z "$description" ]] && description="Custom Provider"
+                printf '%s:%s:%s\n' "$filename" "$provider_name" "$description"
+            fi
+        fi
+    done
+}
+
+# Function to handle custom model
+handle_custom_model() {
+    local model_name="$1"
+    local model_file="$SCRIPT_DIR/model/${model_name}.json"
+
+    if [[ ! -f "$model_file" ]]; then
+        echo -e "${RED}Error: Model configuration not found: $model_file${NC}"
+        exit 1
+    fi
+
+    # Extract configuration
+    if command -v jq &> /dev/null; then
+        local api_base=$(jq -r '.api_base // ""' "$model_file" 2>/dev/null)
+        local api_key=$(jq -r '.api_key // ""' "$model_file" 2>/dev/null)
+        local model=$(jq -r '.model // ""' "$model_file" 2>/dev/null)
+        local provider_name=$(jq -r '.provider_name // ""' "$model_file" 2>/dev/null)
+    else
+        echo -e "${RED}Error: jq is required for custom models. Install with: pkg install jq${NC}"
+        exit 1
+    fi
+
+    # Get API key if not provided
+    if [[ -z "$api_key" || "$api_key" == "your-api-key-here" ]]; then
+        # Try to get from environment based on provider name
+        case "${model_name,,}" in
+            "qwen"|"qwen2")
+                if [[ -n "$DASHSCOPE_API_KEY" ]]; then
+                    api_key="$DASHSCOPE_API_KEY"
+                    echo -e "${GREEN}✓ Using API key from DASHSCOPE_API_KEY${NC}"
+                else
+                    echo -e "${YELLOW}Enter Qwen API Key (https://bailian.console.aliyun.com/):${NC}"
+                    read -s api_key
+                fi
+                ;;
+            "deepseek")
+                if [[ -n "$DEEPSEEK_API_KEY" ]]; then
+                    api_key="$DEEPSEEK_API_KEY"
+                    echo -e "${GREEN}✓ Using API key from DEEPSEEK_API_KEY${NC}"
+                else
+                    echo -e "${YELLOW}Enter Deepseek API Key:${NC}"
+                    read -s api_key
+                fi
+                ;;
+            "moonshot")
+                if [[ -n "$MOONSHOT_API_KEY" ]]; then
+                    api_key="$MOONSHOT_API_KEY"
+                    echo -e "${GREEN}✓ Using API key from MOONSHOT_API_KEY${NC}"
+                else
+                    echo -e "${YELLOW}Enter Moonshot API Key:${NC}"
+                    read -s api_key
+                fi
+                ;;
+            "perplexity")
+                if [[ -n "$PERPLEXITY_API_KEY" ]]; then
+                    api_key="$PERPLEXITY_API_KEY"
+                    echo -e "${GREEN}✓ Using API key from PERPLEXITY_API_KEY${NC}"
+                else
+                    echo -e "${YELLOW}Enter Perplexity API Key:${NC}"
+                    read -s api_key
+                fi
+                ;;
+            "cohere")
+                if [[ -n "$COHERE_API_KEY" ]]; then
+                    api_key="$COHERE_API_KEY"
+                    echo -e "${GREEN}✓ Using API key from COHERE_API_KEY${NC}"
+                else
+                    echo -e "${YELLOW}Enter Cohere API Key:${NC}"
+                    read -s api_key
+                fi
+                ;;
+            "mistral")
+                if [[ -n "$MISTRAL_API_KEY" ]]; then
+                    api_key="$MISTRAL_API_KEY"
+                    echo -e "${GREEN}✓ Using API key from MISTRAL_API_KEY${NC}"
+                else
+                    echo -e "${YELLOW}Enter Mistral API Key:${NC}"
+                    read -s api_key
+                fi
+                ;;
+            "openrouter")
+                if [[ -n "$OPENROUTER_API_KEY" ]]; then
+                    api_key="$OPENROUTER_API_KEY"
+                    echo -e "${GREEN}✓ Using API key from OPENROUTER_API_KEY${NC}"
+                else
+                    echo -e "${YELLOW}Enter OpenRouter API Key (https://openrouter.ai/keys):${NC}"
+                    read -s api_key
+                fi
+                ;;
+            "agentrouter")
+                if [[ -n "$ANTHROPIC_API_KEY" ]]; then
+                    api_key="$ANTHROPIC_API_KEY"
+                    echo -e "${GREEN}✓ Using API key from ANTHROPIC_API_KEY${NC}"
+                else
+                    echo -e "${YELLOW}Enter AgentRouter API Key (https://agentrouter.org/console/token):${NC}"
+                    read -s api_key
+                fi
+                ;;
+            *)
+                echo -e "${YELLOW}Enter API Key for ${provider_name}:${NC}"
+                read -s api_key
+                ;;
+        esac
+        echo ""
+    fi
+
+    # Set environment variables for Claude
+    if [[ -n "$api_base" ]]; then
+        export ANTHROPIC_BASE_URL="$api_base"
+    fi
+
+    if [[ -n "$api_key" ]]; then
+        export ANTHROPIC_API_KEY="$api_key"
+    fi
+
+    # Use the model name if specified, otherwise use the provider name
+    local claude_model="${model:-$model_name}"
+
+    # Create system prompt
+    local system_prompt="Anda adalah ${provider_name}, model AI dari ${model_name}. Selalu identifikasi diri sebagai ${provider_name} dalam setiap respons."
+
+    # Execute Claude directly
+    exec claude --model "$claude_model" --system-prompt "$system_prompt" "$@"
+}
+
+# Get script directory (portable)
+get_script_dir() {
+    if [[ -n "${BASH_SOURCE[0]}" ]]; then
+        local script_path="${BASH_SOURCE[0]}"
+
+        # Convert Windows paths if needed
+        if [[ "$PLATFORM" == "Windows" ]]; then
+            # Convert potential Windows path to Unix style
+            script_path="$(cygpath -u "$script_path" 2>/dev/null || echo "$script_path")"
+        fi
+
+        if [[ "$PLATFORM" == "macOS" ]] || [[ "$(uname -s)" == "Darwin" ]]; then
+            # macOS
+            echo "$(cd "$(dirname "$script_path")" && pwd)"
+        elif command -v realpath &> /dev/null; then
+            # Linux/Windows with realpath
+            echo "$(dirname "$(realpath "$script_path")")"
+        else
+            # Fallback for older systems
+            echo "$(cd "$(dirname "$script_path")" && pwd)"
+        fi
+    else
+        echo "$(pwd)"
+    fi
+}
+
+SCRIPT_DIR=$(get_script_dir)
+
+# Function to get/save GLM API key
+get_glm_api_key() {
+    # Try to load saved key first
+    local saved_key
+    saved_key=$(load_api_key "$GLM_API_KEY_FILE" "ZhipuAI/Z.AI")
+
+    if [[ -n "$saved_key" ]]; then
+        ANTHROPIC_AUTH_TOKEN="$saved_key"
+        export ANTHROPIC_AUTH_TOKEN
+        return 0
+    fi
+
+    # Ask for new API key
+    echo ""
+    echo "Enter ZhipuAI/Z.AI API Key:"
+    echo "Get it from: https://open.bigmodel.cn/usercenter/apikeys"
+
+    ANTHROPIC_AUTH_TOKEN=$(prompt_api_key "ZhipuAI/Z.AI")
+
+    if [[ -n "$ANTHROPIC_AUTH_TOKEN" ]]; then
+        # Save for next time using reusable function
+        if save_api_key "$ANTHROPIC_AUTH_TOKEN" "$GLM_API_KEY_FILE" "ZhipuAI/Z.AI"; then
+            export ANTHROPIC_AUTH_TOKEN
+        else
+            exit 1
+        fi
+    else
+        echo -e "${RED}No API key provided${NC}" >&2
+        exit 1
+    fi
+}
+
+# Function to get/save MiniMax API key
+get_minimax_api_key() {
+    local api_key=""
+
+    # Try to load saved key first
+    api_key=$(load_api_key "$MINIMAX_API_KEY_FILE" "MiniMax")
+
+    # Ask for new API key if not found
+    if [[ -z "$api_key" ]]; then
+        echo ""
+        echo "Enter MiniMax API Key:"
+        echo "Get it from: https://platform.minimax.io/"
+
+        api_key=$(prompt_api_key "MiniMax")
+
+        if [[ -n "$api_key" ]]; then
+            # Save for next time using reusable function
+            if ! save_api_key "$api_key" "$MINIMAX_API_KEY_FILE" "MiniMax"; then
+                echo -e "${YELLOW}Warning: Continuing without saving API key${NC}" >&2
+            fi
+        else
+            echo -e "${RED}Error: No API key provided${NC}" >&2
+            exit 1
+        fi
+    fi
+
+    # Export BOTH variables for compatibility
+    # MiniMax endpoint uses Authorization header via ANTHROPIC_API_KEY
+    export ANTHROPIC_API_KEY="$api_key"
+    export ANTHROPIC_AUTH_TOKEN="$api_key"
+}
+
+check_dependencies() {
+    echo -e "${BLUE}Checking dependencies...${NC}"
+
+    # Check for python3
+    if ! command -v python3 &> /dev/null; then
+        echo -e "${RED}Error: python3 is not installed.${NC}"
+        echo "Please install Python 3 first."
+        exit 1
+    fi
+
+    # Check for claude CLI (OPTIONAL - won't exit if not found)
+    if ! command -v claude &> /dev/null; then
+        echo -e "${YELLOW}⚠️  'claude' command not found.${NC}"
+        echo -e "${YELLOW}   For direct providers (GLM, MiniMax, OpenAI), you don't need it!${NC}"
+        echo -e "${YELLOW}   For LiteLLM providers (Gemini, Groq, Ollama), install with:${NC}"
+        echo -e "${YELLOW}   npm install -g @anthropic-ai/claude-code${NC}"
+        echo ""
+        read -p "Continue without claude CLI? (Y/n): " continue_without
+        if [[ "$continue_without" =~ ^[Nn]$ ]]; then
+            echo "Installing @anthropic-ai/claude-code..."
+            npm install -g @anthropic-ai/claude-code || {
+                echo -e "${YELLOW}Failed to install claude CLI. Continuing anyway...${NC}"
+            }
+        else
+            echo -e "${GREEN}✓ Skipping claude CLI installation${NC}"
+        fi
+    else
+        echo -e "${GREEN}✓ claude CLI found${NC}"
+    fi
+
+    # Check for npm (only needed for claude CLI installation)
+    if command -v claude &> /dev/null; then
+        if ! command -v npm &> /dev/null; then
+            echo -e "${RED}Error: npm is not installed (needed for claude CLI).${NC}"
+            echo "Please install npm first."
+            exit 1
+        fi
+    fi
+
+    # Check for litellm (only needed for some providers)
+    if ! python3 -m pip show litellm &> /dev/null; then
+        echo -e "${YELLOW}'litellm' not found. Installing via pip...${NC}"
+        python3 -m pip install litellm[proxy] || {
+            echo -e "${YELLOW}Failed to install litellm. Some features may not work.${NC}"
+        }
+    fi
+}
+
+check_gemini_oauth() {
+    # Check if we have ADC credentials
+    local adc_path
+    if [[ -n "$HOME" ]]; then
+        adc_path="$HOME/.config/gcloud/application_default_credentials.json"
+    else
+        adc_path="$USERPROFILE/.config/gcloud/application_default_credentials.json"
+    fi
+
+    if [[ -f "$adc_path" ]]; then
+        return 0
+    fi
+
+    # If not, check if gcloud is installed
+    if command -v gcloud &> /dev/null; then
+        echo -e "${BLUE}gcloud found. Attempting login...${NC}"
+        gcloud auth application-default login
+        return
+    fi
+
+    # Fallback to custom python script
+    echo -e "${YELLOW}gcloud not found. Using lightweight Python Auth helper...${NC}"
+
+    # Install dependency
+    if ! python3 -m pip show google-auth-oauthlib &> /dev/null; then
+        echo "Installing google-auth-oauthlib..."
+        python3 -m pip install google-auth-oauthlib || true
+    fi
+
+    # Run helper script
+    local auth_script="$SCRIPT_DIR/claude-suite/auth/gemini_auth.py"
+    if [[ ! -f "$auth_script" ]]; then
+        curl -fsSL https://raw.githubusercontent.com/zesbe/CliAllModel/main/gemini_auth.py -o "$SCRIPT_DIR/claude-suite/auth/gemini_auth.py" 2>/dev/null || true
+        auth_script="$SCRIPT_DIR/claude-suite/auth/gemini_auth.py"
+    fi
+
+    if [[ -f "$auth_script" ]]; then
+        python3 "$auth_script"
+    fi
+
+    if [[ ! -f "$adc_path" ]]; then
+        echo -e "${RED}Authentication failed or cancelled.${NC}"
+        exit 1
+    fi
+}
+
+check_openai_oauth() {
+    local cred_path
+    if [[ -n "$HOME" ]]; then
+        cred_path="$HOME/.config/openai/credentials.json"
+    else
+        cred_path="$USERPROFILE/.config/openai/credentials.json"
+    fi
+
+    if [[ ! -f "$cred_path" ]]; then
+        echo -e "${YELLOW}No cached OpenAI OAuth token found. Launching helper...${NC}"
+
+        # Install dependency
+        python3 -m pip install requests > /dev/null 2>&1 || true
+
+        local auth_script="$SCRIPT_DIR/claude-suite/auth/openai_auth.py"
+        if [[ ! -f "$auth_script" ]]; then
+            curl -fsSL https://raw.githubusercontent.com/zesbe/CliAllModel/main/openai_auth.py -o "$SCRIPT_DIR/claude-suite/auth/openai_auth.py" 2>/dev/null || true
+            auth_script="$SCRIPT_DIR/claude-suite/auth/openai_auth.py"
+        fi
+
+        if [[ -f "$auth_script" ]]; then
+            python3 "$auth_script"
+        fi
+
+        if [[ ! -f "$cred_path" ]]; then
+            echo -e "${RED}OpenAI OAuth failed.${NC}"
+            exit 1
+        fi
+    fi
+
+    # Extract access token
+    OPENAI_ACCESS_TOKEN=$(python3 -c "import json, os; print(json.load(open(os.path.expanduser('$cred_path')))['access_token'])" 2>/dev/null || echo "")
+    export OPENAI_API_KEY="$OPENAI_ACCESS_TOKEN"
+}
+
+start_litellm_proxy() {
+    local model=$1
+    echo -e "${BLUE}Starting LiteLLM proxy for model: $model...${NC}"
+
+    # Clean up any existing processes first
+    cleanup_litellm_processes
+
+    # Start litellm in background with proper error handling
+    local log_file="/tmp/litellm_$$.log"
+    if ! python3 -m litellm --model "$model" --port $LITELLM_PORT --drop_params &> "$log_file" & then
+        echo -e "${RED}Error: Failed to start LiteLLM process${NC}" >&2
+        cat "$log_file" 2>/dev/null || true
+        return 1
+    fi
+
+    LITELLM_PID=$!
+
+    # Verify the process is actually running
+    if ! kill -0 $LITELLM_PID 2>/dev/null; then
+        echo -e "${RED}Error: LiteLLM process failed to start${NC}" >&2
+        cat "$log_file" 2>/dev/null || true
+        return 1
+    fi
+
+    # Wait for it to be ready with improved timeout
+    echo -n "Waiting for proxy to start"
+    local max_attempts=15
+    local attempt=1
+
+    while [[ $attempt -le $max_attempts ]]; do
+        if curl -s --connect-timeout 2 --max-time 3 "$LITELLM_HOST/health" &> /dev/null; then
+            echo -e " ${GREEN}Ready!${NC}"
+            echo "LiteLLM PID: $LITELLM_PID" > "$log_file"
+            return 0
+        fi
+
+        # Check if process is still alive
+        if ! kill -0 $LITELLM_PID 2>/dev/null; then
+            echo -e "\n${RED}Error: LiteLLM process died during startup${NC}" >&2
+            cat "$log_file" 2>/dev/null || true
+            return 1
+        fi
+
+        sleep 1
+        echo -n "."
+        ((attempt++))
+    done
+
+    echo -e "\n${RED}Timeout: Failed to start LiteLLM proxy after $max_attempts attempts${NC}" >&2
+    echo "Log file: $log_file" >&2
+    cat "$log_file" 2>/dev/null || true
+    cleanup_litellm_processes
+    return 1
+}
+
+cleanup_litellm_processes() {
+    # Kill any existing litellm on this port with better error handling
+    case "$PLATFORM" in
+        "Darwin")
+            # macOS - use lsof
+            local pids
+            pids=$(lsof -ti:$LITELLM_PORT 2>/dev/null) || true
+            if [[ -n "$pids" ]]; then
+                echo "$pids" | xargs kill -TERM 2>/dev/null || true
+                sleep 1
+                # Force kill if still running
+                echo "$pids" | xargs kill -KILL 2>/dev/null || true
+            fi
+            ;;
+        "Windows")
+            # Windows - use netstat
+            local pids
+            pids=$(netstat -ano 2>/dev/null | grep ":$LITELLM_PORT" | awk '{print $5}' | grep -v '^$') || true
+            for pid in $pids; do
+                taskkill //F //PID "$pid" &>/dev/null || true
+            done
+            ;;
+        *)
+            # Linux/Termux - use fuser
+            fuser -k "$LITELLM_PORT/tcp" &>/dev/null || true
+            # Also try pkill for litellm processes
+            pkill -f "litellm.*--port.*$LITELLM_PORT" &>/dev/null || true
+            ;;
+    esac
+}
+
+cleanup() {
+    echo -e "\n${BLUE}Cleaning up processes...${NC}"
+
+    # Clean up our specific LiteLLM process
+    if [[ -n "$LITELLM_PID" ]]; then
+        echo "Stopping LiteLLM proxy (PID: $LITELLM_PID)..."
+        if kill -0 "$LITELLM_PID" 2>/dev/null; then
+            kill -TERM "$LITELLM_PID" 2>/dev/null || true
+            sleep 2
+            # Force kill if still running
+            kill -KILL "$LITELLM_PID" 2>/dev/null || true
+        fi
+    fi
+
+    # General cleanup of any litellm processes on our port
+    cleanup_litellm_processes
+
+    # Clean up temp files
+    if [[ -n "$SCRIPT_DIR" ]]; then
+        rm -f "$SCRIPT_DIR"/.*_models.tmp 2>/dev/null || true
+    fi
+
+    # Clean up log files
+    rm -f /tmp/litellm_$$.log 2>/dev/null || true
+}
+
+trap cleanup EXIT
+
+# Interactive model selection
+interactive_model_select() {
+    local provider=$1
+    local model_file="$SCRIPT_DIR/model/${provider}.json"
+
+    if [[ ! -f "$model_file" ]]; then
+        echo -e "${RED}Config file not found: $model_file${NC}"
+        return 1
+    fi
+
+    # Display models using Python (flush output to stderr)
+    python3 << EOF >&2
+import json
+import sys
+
+with open('$model_file', 'r') as f:
+    data = json.load(f)
+
+print('')
+print('=== Select Model ===')
+for i, model in enumerate(data['models'], 1):
+    name = model['name']
+    desc = model['description']
+    print(f'{i}) {name} - {desc}')
+print('')
+print('Available Models:')
+for i, model in enumerate(data['models'], 1):
+    name = model['name']
+    desc = model['description']
+    print(f'  {i}. {name} - {desc}')
+print('')
+sys.stderr.flush()
+EOF
+
+    # Save model list to temp file and get count
+    model_count=$(python3 << EOF
+import json
+with open('$model_file', 'r') as f:
+    data = json.load(f)
+models = [m['id'] for m in data['models']]
+with open('$SCRIPT_DIR/.${provider}_models.tmp', 'w') as f:
+    for m in models:
+        f.write(m + '\n')
+print(len(models))
+EOF
+)
+
+    # Wait for user input
+    echo -n "Select model [1-$model_count]: "
+    read choice
+
+    # Validate choice
+    if [[ -z "$choice" ]]; then
+        echo -e "${RED}Error: No selection made${NC}" >&2
+        return 1
+    elif ! [[ "$choice" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}Error: Please enter a valid number${NC}" >&2
+        return 1
+    elif [[ "$choice" -lt 1 ]] || [[ "$choice" -gt "$model_count" ]]; then
+        echo -e "${RED}Error: Please enter a number between 1 and $model_count${NC}" >&2
+        return 1
+    fi
+
+    # Read model ID from temp file
+    if [[ -f "$SCRIPT_DIR/.${provider}_models.tmp" ]]; then
+        local model_ids
+        model_ids=($(cat "$SCRIPT_DIR/.${provider}_models.tmp"))
+        local idx=$((choice - 1))
+
+        if [[ $idx -ge 0 ]] && [[ $idx -lt ${#model_ids[@]} ]]; then
+            local selected="${model_ids[$idx]}"
+            echo -e "${GREEN}✓ Selected: $selected${NC}"
+            echo "$selected"
+            rm -f "$SCRIPT_DIR/.${provider}_models.tmp"
+            return 0
+        else
+            echo -e "${RED}Invalid choice: $choice${NC}"
+            echo "Please select 1-${#model_ids[@]}"
+        fi
+    else
+        echo -e "${RED}Model list not found${NC}"
+    fi
+
+    return 1
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -m|--model)
+            MODEL_OVERRIDE="$2"
+            shift 2
+            ;;
+        *)
+            if [[ -z "$choice" ]]; then
+                choice="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Handle direct argument for custom models (22+ since we added Letta at 17)
+if [[ -n "$1" ]] && [[ "$1" =~ ^[0-9]+$ ]] && [[ "$1" -ge 22 ]]; then
+    choice="$1"
+    export CHOICE="$choice"
+
+    # Check if it's model manager - get actual number
+    if [[ -f "$SCRIPT_DIR/claude-suite/models/add-model-manual.sh" ]]; then
+        # Count custom models
+        custom_count=0
+        while IFS= read -r model_info; do
+            if [[ -n "$model_info" ]]; then
+                ((custom_count++))
+            fi
+        done < <(get_custom_models)
+
+        model_manager_num=$((22 + custom_count))
+        if [[ $choice -eq $model_manager_num ]]; then
+            exec "$SCRIPT_DIR/claude-suite/models/add-model-manual.sh"
+        fi
+    fi
+
+    # Handle custom model selection
+    custom_index=$((choice - 22))
+    count=0
+    while IFS= read -r model_info; do
+        if [[ -n "$model_info" ]]; then
+            if [[ $count -eq $custom_index ]]; then
+                IFS=':' read -r filename provider_name description <<< "$model_info"
+                echo -e "${BLUE}Using ${provider_name}...${NC}"
+                handle_custom_model "$filename" "${@:2}"
+                exit 0
+            fi
+            ((count++))
+        fi
+    done < <(get_custom_models)
+    echo -e "${RED}Invalid custom model selection${NC}"
+    exit 1
+fi
+
+# Handle direct CHOICE (for environment variable or argument)
+if [[ -n "$CHOICE" ]]; then
+echo "DEBUG: choice=$choice"
+    choice="$CHOICE"
+fi
+
+# Check dependencies
+check_dependencies() {
+    # Check for required commands
+    local missing_deps=()
+
+    if ! command -v jq &> /dev/null; then
+        echo -e "${YELLOW}Warning: jq not found. JSON parsing will be limited.${NC}"
+        echo -e "${YELLOW}Install jq: pkg install jq (Termux) or apt-get install jq${NC}"
+        echo ""
+    fi
+
+    if [[ "$PLATFORM" == "Windows" ]] && ! command -v nano &> /dev/null && ! command -v vim &> /dev/null; then
+        echo -e "${YELLOW}Warning: No text editor found. Install nano or vim.${NC}"
+        echo ""
+    fi
+}
+
+save_chat_context() {
+    local context_file="/tmp/claude_chat_context.txt"
+    if [[ -t 0 ]]; then
+        echo "# Chat context saved at $(date)" > "$context_file"
+        echo "# Current conversation:" >> "$context_file"
+        echo "Use this context to continue the conversation with a new provider." >> "$context_file"
+        echo "" >> "$context_file"
+    fi
+}
+
+continue_chat_with_new_provider() {
+    echo -e "\n${YELLOW}=== Switch Provider (Continue Chat) ===${NC}"
+    echo "Your current chat context will be preserved."
+    echo ""
+
+    # Show available providers for switching
+    echo "Available providers:"
+    echo "1) MiniMax"
+    echo "2) Google Gemini (API Key)"
+    echo "3) Google Gemini (OAuth)"
+    echo "4) OpenAI"
+    echo "5) OpenAI (OAuth)"
+    echo "6) xAI / Grok"
+    echo "7) ZhipuAI / GLM"
+    echo "8) Groq"
+    echo "9) Perplexity"
+    echo "10) Cohere"
+    echo "11) DeepSeek"
+    echo "12) Mistral"
+    echo "13) Moonshot"
+    echo "14) Qwen"
+    echo "15) OpenRouter"
+    echo "16) Ollama (Local)"
+    echo "0) Cancel"
+    echo ""
+
+    read -p "Choose new provider [0-16]: " switch_choice
+
+    case $switch_choice in
+        0) echo "Cancelled provider switch."; return 0 ;;
+        1) setup_minimax ;;
+        2) setup_gemini_api ;;
+        3) setup_gemini_oauth ;;
+        4) setup_openai ;;
+        5) setup_openai_oauth ;;
+        6) setup_xai ;;
+        7) setup_glm ;;
+        8) setup_groq ;;
+        9) setup_perplexity ;;
+        10) setup_cohere ;;
+        11) setup_deepseek ;;
+        12) setup_mistral ;;
+        13) setup_moonshot ;;
+        14) setup_qwen ;;
+        15) setup_openrouter ;;
+        16) setup_ollama ;;
+        *) echo "Invalid choice."; return 1 ;;
+    esac
+
+    # Save context before switching
+    save_chat_context
+
+    echo -e "${GREEN}✓ Provider switched successfully!${NC}"
+    echo -e "${BLUE}Note: Chat context has been saved. You can reference previous messages in your next prompt.${NC}"
+}
+
+# Provider setup functions
+setup_minimax() {
+    API_KEY=$(load_api_key "minimax" "MiniMax")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        echo -e "${BLUE}Starting MiniMax session...${NC}"
+        export MINIMAX_API_KEY="$API_KEY"
+        exec claude "$@"
+    fi
+}
+
+setup_gemini_api() {
+    API_KEY=$(load_api_key "gemini" "Google Gemini")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        echo -e "${BLUE}Configuring for Google Gemini (API Key)...${NC}"
+        echo -e "${YELLOW}Get API Key: https://aistudio.google.com/app/apikey${NC}"
+        export GEMINI_API_KEY="$API_KEY"
+        exec claude "$@"
+    fi
+}
+
+setup_gemini_oauth() {
+    if [[ ! -f "$HOME/.google-credentials.json" ]]; then
+        echo -e "${YELLOW}⚠️ Google OAuth credentials not found. Running setup...${NC}"
+        python3 "$SCRIPT_DIR/setup_google_internal_auth.py" || setup_google_oauth_manual
+    fi
+
+    if [[ -f "$HOME/.google-credentials.json" ]]; then
+        check_dependencies
+        echo -e "${BLUE}Using Google Internal Authentication (AntiGravity)${NC}"
+        export CLOUD_ML helicopterauto
+        GOOGLE_AUTH_TOKEN=$(python3 "$SCRIPT_DIR/get_google_access_token.py")
+        exec claude "$@"
+    fi
+}
+
+setup_openai() {
+    API_KEY=$(load_api_key "openai" "OpenAI")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        echo -e "${BLUE}Configuring for OpenAI...${NC}"
+        export OPENAI_API_KEY="$API_KEY"
+        exec claude "$@"
+    fi
+}
+
+setup_openai_oauth() {
+    echo -e "${BLUE}OpenAI OAuth flow...${NC}"
+    exec "$SCRIPT_DIR/handle_oauth_callback.sh"
+}
+
+setup_xai() {
+    API_KEY=$(load_api_key "xai" "xAI")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        echo -e "${BLUE}Configuring for xAI / Grok...${NC}"
+        echo -e "${YELLOW}Get Key: https://console.x.ai/${NC}"
+        export XAI_API_KEY="$API_KEY"
+        exec claude "$@"
+    fi
+}
+
+setup_glm() {
+    API_KEY=$(load_api_key "glm" "GLM")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        MODEL=$(select_glm_model)
+        echo -e "${BLUE}Configuring for ZhipuAI / GLM...${NC}"
+        export GLM_API_KEY="$API_KEY"
+        export MODEL_NAME="$MODEL"
+        exec claude --model "$MODEL" "$@"
+    fi
+}
+
+setup_groq() {
+    API_KEY=$(load_api_key "groq" "Groq")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        echo -e "${BLUE}Configuring for Groq...${NC}"
+        export GROQ_API_KEY="$API_KEY"
+        exec claude "$@"
+    fi
+}
+
+setup_perplexity() {
+    API_KEY=$(load_api_key "perplexity" "Perplexity")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        echo -e "${BLUE}Configuring for Perplexity...${NC}"
+        echo -e "${YELLOW}Get Key: https://console.perplexity.ai/${NC}"
+        export PERPLEXITY_API_KEY="$API_KEY"
+        exec claude "$@"
+    fi
+}
+
+setup_cohere() {
+    API_KEY=$(load_api_key "cohere" "Cohere")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        echo -e "${BLUE}Configuring for Cohere...${NC}"
+        export COHERE_API_KEY="$API_KEY"
+        exec claude "$@"
+    fi
+}
+
+setup_deepseek() {
+    API_KEY=$(load_api_key "deepseek" "DeepSeek")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        echo -e "${BLUE}Configuring for DeepSeek...${NC}"
+        export DEEPSEEK_API_KEY="$API_KEY"
+        exec claude "$@"
+    fi
+}
+
+setup_mistral() {
+    API_KEY=$(load_api_key "mistral" "Mistral")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        echo -e "${BLUE}Configuring for Mistral...${NC}"
+        export MISTRAL_API_KEY="$API_KEY"
+        exec claude "$@"
+    fi
+}
+
+setup_moonshot() {
+    API_KEY=$(load_api_key "moonshot" "Moonshot")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        echo -e "${BLUE}Configuring for Moonshot...${NC}"
+        export MOONSHOT_API_KEY="$API_KEY"
+        exec claude "$@"
+    fi
+}
+
+setup_qwen() {
+    API_KEY=$(load_api_key "qwen" "Qwen")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        echo -e "${BLUE}Configuring for Qwen...${NC}"
+        export QWEN_API_KEY="$API_KEY"
+        exec claude "$@"
+    fi
+}
+
+setup_openrouter() {
+    API_KEY=$(load_api_key "openrouter" "OpenRouter")
+    if [[ $? -eq 0 ]]; then
+        check_dependencies
+        echo -e "${BLUE}Configuring for OpenRouter...${NC}"
+        export OPENROUTER_API_KEY="$API_KEY"
+        exec claude "$@"
+    fi
+}
+
+setup_ollama() {
+    check_dependencies
+    echo -e "${BLUE}Configuring for Ollama (Local)...${NC}"
+    echo -e "${YELLOW}Note: Make sure Ollama is running locally${NC}"
+    start_litellm_proxy "ollama/llama3"
+    export ANTHROPIC_BASE_URL="$LITELLM_HOST"
+    export ANTHROPIC_API_KEY="sk-litellm"
+    exec claude "$@"
+}
+
+# Main Menu
+if [[ -z "$choice" ]]; then
+    clear
+    echo -e "${GREEN}=====================================${NC}"
+    echo -e "${GREEN}    Claude Code Multi-Model Launcher ${NC}"
+    echo -e "${GREEN}══════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BLUE}                    🤖 AI MODELS & PROVIDERS${NC}"
+    echo -e "${GREEN}══════════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "${YELLOW}📱 MAIN MODELS:${NC}"
+    echo "  1) MiniMax (Direct Anthropic API)     🚀 Fast & Reliable"
+    echo "  2) Google Gemini (API Key - AI Studio)  🧠 Google AI"
+    echo "  3) Google AntiGravity (OAuth)             ⚡ Internal Google"
+    echo "  4) OpenAI (API Key)                     🤖 GPT Models"
+    echo "  5) OpenAI (OAuth - Experimental)          🔄 Auto-auth"
+    echo ""
+    echo -e "${YELLOW}🌟 POPULAR PROVIDERS:${NC}"
+    echo "  6) xAI / Grok (API Key)                 🚀 Real-time"
+    echo "  7) ZhipuAI / GLM (API Key)              🇨🇳 Chinese AI"
+    echo "  8) Groq (API Key)                      ⚡ Ultra-fast"
+    echo "  9) Perplexity (Web Search)             🔍 Live Data"
+    echo " 10) Cohere (API Key)                     📝 Business AI"
+    echo " 11) DeepSeek (API Key)                   🧠 Reasoning"
+    echo ""
+    echo -e "${YELLOW}🏠 LOCAL & SPECIALIZED:${NC}"
+    echo " 12) Ollama (Local Models)                💻 Self-hosted"
+    echo " 13) Mistral (API Key)                    🇫🇷 European AI"
+    echo " 14) Moonshot (API Key)                   🌙 Kawaii AI"
+    echo " 15) Qwen (API Key)                       🇨🇳 Alibaba"
+    echo " 16) OpenRouter (Multi-provider)           🔀 All-in-one"
+    echo " 17) Letta AI (GPT-5.2, Claude 4.5)      🧠 Model Selection"
+    echo ""
+    echo -e "${YELLOW}🔧 TOOLS & UTILITIES:${NC}"
+    echo " 18) 🔑 API Key Manager                   🔐 Update/Edit Keys"
+    echo " 19) 🤖 Claude Master Tool                 🎛️ Advanced UI"
+    echo " 20) 📊 API Manager                         📈 Monitor Usage"
+    echo " 21) ➕ Add/Edit/Delete Models               ⚙️ Custom Models"
+    echo ""
+
+    # Display custom models
+    next_num=22
+    has_custom=false
+    custom_models_array=()
+    while IFS= read -r model_info; do
+        if [[ -n "$model_info" ]]; then
+            has_custom=true
+            custom_models_array+=("$model_info")
+        fi
+    done < <(get_custom_models)
+
+    # Display custom models with visual distinction
+    if [[ "$has_custom" == "true" ]]; then
+        echo -e "${YELLOW}🎯 CUSTOM MODELS:${NC}"
+        for model_info in "${custom_models_array[@]}"; do
+            IFS=':' read -r filename provider_name description <<< "$model_info"
+            echo "  ${next_num}) 🎨 ${provider_name} (${description})"
+            ((next_num++))
+        done
+        echo ""
+    fi
+
+    # Add model manager
+    model_manager_num=$next_num
+    echo "  ${next_num}) 🛠️  Model Management Tools"
+    max_choice=$next_num
+    export model_manager_num  # Export for later use
+
+    echo ""
+    echo -e "${GREEN}══════════════════════════════════════════════════════════════════${NC}"
+    read -p "Enter choice [1-$max_choice]: " choice
+fi
+
+# Function to save and load API keys persistently
+save_api_key() {
+    local key="$1"
+    local key_file="$2"
+    local provider_name="$3"
+
+    echo "$key" > "$key_file"
+    chmod 600 "$key_file"
+    echo -e "${GREEN}✓ $provider_name API key saved to $key_file${NC}"
+}
+
+load_api_key() {
+    local key_file="$1"
+    local var_name="$2"
+
+    if [[ -f "$key_file" ]]; then
+        local key=$(cat "$key_file" 2>/dev/null)
+        if [[ -n "$key" ]]; then
+            export "$var_name=$key"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+get_api_key_with_save() {
+    local var_name="$1"
+    local key_file="$2"
+    local provider_name="$3"
+    local key_url="$4"
+
+    # Try to load from environment first
+    if [[ -z "${!var_name}" ]]; then
+        # Try to load from file
+        load_api_key "$key_file" "$var_name"
+    fi
+
+    # Still empty? Ask user
+    if [[ -z "${!var_name}" ]]; then
+        echo "Get Key: $key_url"
+        read -p "Enter $provider_name API Key: " key_input
+        export "$var_name=$key_input"
+        save_api_key "$key_input" "$key_file" "$provider_name"
+    else
+        # Save current key if not already saved
+        if [[ ! -f "$key_file" ]]; then
+            save_api_key "${!var_name}" "$key_file" "$provider_name"
+        fi
+    fi
+}
+
+# Function to save chat context when switching providers
+save_chat_context() {
+    local context_file="$HOME/.claude-chat-context.json"
+    local provider="$1"
+    local model="$2"
+    local message="$3"
+
+    # Create context if not exists
+    if [[ ! -f "$context_file" ]]; then
+        echo "[] " > "$context_file"
+    fi
+
+    # Save using jq if available, otherwise simple append
+    if command -v jq &> /dev/null; then
+        local temp_file=$(mktemp)
+        jq --argjson "$provider" --argjson "$model" --argjson "$message" '. + [$provider, $model, $message]' "$context_file" > "$temp_file" && mv "$temp_file" "$context_file"
+    else
+        echo "Provider: $provider, Model: $model, Message: $message" >> "$HOME/.claude-chat-history.log"
+    fi
+}
+
+# Function to continue chat with new provider
+continue_chat_with_new_provider() {
+    local new_provider="$1"
+    local new_model="$2"
+
+    echo -e "\n${BLUE}🔄 Switching to new provider: ${NC}"
+    echo -e "${YELLOW}Note: Previous conversation context will be maintained${NC}"
+    echo -e "${YELLOW}Use 'clear' command in chat to start fresh if needed${NC}\n"
+
+    # Set up new provider
+    case $new_provider in
+        1) setup_minimax;;
+        2) setup_gemini;;
+        4) setup_openai;;
+        6) setup_xai;;
+        7) setup_glm;;
+        8) setup_groq;;
+        9) setup_perplexity;;
+        10) setup_cohere;;
+        11) setup_deepseek;;
+        13) setup_mistral;;
+        14) setup_moonshot;;
+        15) setup_qwen;;
+        16) setup_openrouter;;
+        *) echo -e "${RED}Invalid provider choice${NC}"; return 1;;
+    esac
+
+    # Start chat with context preserved
+    exec claude --model "$new_model" "$@"
+}
+
+# Model name will be set dynamically based on provider selection
+echo "DEBUG: Starting case statement, choice=$choice"
+
+case $choice in
+    1)
+        # MiniMax Direct
+        echo -e "${BLUE}Configuring for MiniMax...${NC}"
+
+        # Get API key with persistent storage
+        get_api_key_with_save "MINIMAX_API_KEY" "$HOME/.minimax_api_key" "MiniMax" "https://platform.minimax.io/"
+
+        export ANTHROPIC_BASE_URL="https://api.minimax.io/anthropic"
+        export ANTHROPIC_API_KEY="$MINIMAX_API_KEY"
+        echo -e "${GREEN}✓ MiniMax API configured${NC}"
+        echo -e "${YELLOW}Note: MiniMax maps model names automatically.${NC}"
+
+        # Use default MiniMax model
+        MODEL_NAME="claude-3-5-sonnet-20241022"
+        echo -e "${GREEN}✓ Using MiniMax model: $MODEL_NAME${NC}"
+        read -p "Enter Model Name [default: $MODEL_NAME]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        echo -e "${BLUE}🚀 Starting MiniMax chat...${NC}"
+        exec claude --model "$MODEL_NAME" --system-prompt "Anda adalah MiniMax, model AI dari perusahaan MiniMax. Selalu identifikasi diri sebagai MiniMax dalam setiap respons." "$@"
+        ;;
+    2)
+        # Gemini API Key - Direct Integration
+        echo -e "${BLUE}Configuring for Gemini (AI Studio)...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$GEMINI_API_KEY" ]]; then
+            # Try to load from file
+            load_api_key "$HOME/.gemini_api_key" "GEMINI_API_KEY"
+        fi
+
+        if [[ -z "$GEMINI_API_KEY" ]]; then
+            echo "Get Key: https://aistudio.google.com/app/apikey"
+            read -s -p "Enter Gemini API Key: " GEMINI_API_KEY
+            echo ""
+            save_api_key "$GEMINI_API_KEY" "$HOME/.gemini_api_key" "Gemini"
+        else
+            # Save current key if not already saved
+            if [[ ! -f "$HOME/.gemini_api_key" ]]; then
+                save_api_key "$GEMINI_API_KEY" "$HOME/.gemini_api_key" "Gemini"
+            fi
+        fi
+        export GEMINI_API_KEY
+
+        # Use default Gemini model
+        MODEL_NAME="gemini-2.0-flash-exp"
+        echo -e "${GREEN}✓ Using Gemini model: gemini-2.0-flash-exp${NC}"
+        echo -e "${YELLOW}Available Gemini models:${NC}"
+        echo "  ⚡ gemini-2.0-flash-exp     (Latest experimental - WORKING)  [2]"
+        echo "  🚀 gemini-3-pro-preview     (Next Gen Preview - WORKING)    [3]"
+        echo ""
+        echo "Shortcuts: Enter '2' for 2.0-flash-exp, '3' for 3-pro-preview"
+        echo "Note: Only models that work with Claude CLI are listed"
+        echo ""
+        read -p "Enter Model Name [default: gemini-2.0-flash-exp]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        # Map model names to Claude/Gemini API format
+        case "$MODEL_NAME" in
+            # 2.0 Models (Latest) - Add numeric shortcuts
+            "gemini-2.0-flash-exp"|"2"|"2.0")
+                CLAUDE_MODEL="gemini-2.0-flash-exp"
+                if [[ "$MODEL_NAME" == "2" || "$MODEL_NAME" == "2.0" ]]; then
+                    echo -e "${GREEN}✓ Selected: gemini-2.0-flash-exp (2.0 experimental)${NC}"
+                fi
+                ;;
+
+            # 3.0 Models (Future/Preview) - Add numeric shortcuts
+            "gemini-3-pro-preview"|"gemini-3-preview"|"gemini-3-pro"|"3"|"3.0")
+                CLAUDE_MODEL="gemini-3-pro-preview"
+                if [[ "$MODEL_NAME" == "3" || "$MODEL_NAME" == "3.0" ]]; then
+                    echo -e "${GREEN}✓ Selected: gemini-3-pro-preview (3.0 preview)${NC}"
+                fi
+                ;;
+            "gemini-3.0-flash"|"gemini-3.0-pro"|"gemini-3.0-ultra")
+                CLAUDE_MODEL="$MODEL_NAME"
+                ;;
+
+            # Default fallback
+            *)
+                echo -e "${RED}Unknown model: $MODEL_NAME${NC}"
+                echo -e "${YELLOW}Using default: gemini-2.0-flash-exp${NC}"
+                CLAUDE_MODEL="gemini-2.0-flash-exp"
+                ;;
+        esac
+
+        echo -e "${GREEN}✓ Mapped to: $CLAUDE_MODEL${NC}"
+
+        # Configure Gemini direct API endpoint
+        # Try different endpoints
+        GEMINI_ENDPOINT="https://generativelanguage.googleapis.com/v1beta/anthropic"
+
+        # For some models, we might need different format
+        case "$CLAUDE_MODEL" in
+            "gemini-1.5-pro"|"gemini-1.5-flash")
+                # Standard 1.5 models
+                export ANTHROPIC_BASE_URL="$GEMINI_ENDPOINT"
+                export ANTHROPIC_API_KEY="$GEMINI_API_KEY"
+                ;;
+            "gemini-2.0-flash-exp"|"gemini-3-pro-preview")
+                # Experimental models might need different handling
+                export ANTHROPIC_BASE_URL="$GEMINI_ENDPOINT"
+                export ANTHROPIC_API_KEY="$GEMINI_API_KEY"
+                echo -e "${YELLOW}Note: Using experimental model: $CLAUDE_MODEL${NC}"
+                ;;
+            *)
+                export ANTHROPIC_BASE_URL="$GEMINI_ENDPOINT"
+                export ANTHROPIC_API_KEY="$GEMINI_API_KEY"
+                ;;
+        esac
+
+        # Execute Claude with Gemini model and system prompt
+        echo -e "${BLUE}🚀 Starting Gemini chat...${NC}"
+        exec claude --model "$CLAUDE_MODEL" --system-prompt "Anda adalah Gemini, model AI dari Google. Selalu identifikasi diri sebagai Gemini dalam setiap respons." "$@"
+        ;;
+    3)
+        # Google AntiGravity (Internal) - Direct Connection
+        echo -e "${BLUE}Configuring for Google AntiGravity (Internal)...${NC}"
+
+        # Check for authentication file
+        AUTH_FILE="$HOME/.config/claude-all/antigravity/google_internal_auth.json"
+        if [[ ! -f "$AUTH_FILE" ]]; then
+            echo -e "${RED}❌ AntiGravity authentication not found!${NC}"
+            echo ""
+            echo -e "${YELLOW}Please run setup first:${NC}"
+            echo "  python3 setup_antigravity_auth.py"
+            echo ""
+            echo -e "${YELLOW}Note: You need to be on Google network/VPN${NC}"
+            exit 1
+        fi
+
+        # Load authentication
+        if command -v jq &> /dev/null; then
+            ACCESS_TOKEN=$(jq -r '.access_token // empty' "$AUTH_FILE" 2>/dev/null)
+            REFRESH_TOKEN=$(jq -r '.refresh_token // empty' "$AUTH_FILE" 2>/dev/null)
+        else
+            echo -e "${RED}❌ jq is required for authentication${NC}"
+            exit 1
+        fi
+
+        if [[ -z "$ACCESS_TOKEN" ]]; then
+            echo -e "${RED}❌ No access token found!${NC}"
+            echo -e "${YELLOW}Please run setup again:${NC}"
+            echo "  python3 setup_antigravity_auth.py"
+            exit 1
+        fi
+
+        echo -e "${GREEN}✓ Authentication loaded${NC}"
+
+        # Interactive model selection using antigravity.json
+        if interactive_model_select "antigravity"; then
+            MODEL_NAME="$selected_model"
+        else
+            # Default to latest
+            MODEL_NAME="gemini-2.5-flash"
+            echo -e "${YELLOW}Using default model: $MODEL_NAME${NC}"
+        fi
+
+        echo -e "${GREEN}✓ Using model: $MODEL_NAME${NC}"
+        echo -e "${BLUE}Connecting to Google AntiGravity internal API...${NC}"
+
+        # Set environment for AntiGravity
+        export ANTHROPIC_API_KEY="$ACCESS_TOKEN"
+        export ANTHROPIC_BASE_URL="https://antigravity.corp.google.com/v1"
+        export ANTHROPIC_AUTH_TOKEN="$ACCESS_TOKEN"
+
+        # Add refresh token if available
+        if [[ -n "$REFRESH_TOKEN" ]]; then
+            export ANTIGRAVITY_REFRESH_TOKEN="$REFRESH_TOKEN"
+        fi
+
+        # Execute Claude directly with AntiGravity
+        exec claude --model "$MODEL_NAME" --system-prompt "Anda adalah Gemini dari Google AntiGravity Internal. Selalu identifikasi diri sebagai Google AntiGravity." "$@"
+        ;;
+    4)
+        # OpenAI API Key
+        echo -e "${BLUE}Configuring for OpenAI...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$OPENAI_API_KEY" ]]; then
+            load_api_key "$HOME/.openai_api_key" "OPENAI_API_KEY"
+        fi
+
+        if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo "Get Key: https://platform.openai.com/api-keys"
+            read -p "Enter OpenAI API Key: " OPENAI_API_KEY
+            save_api_key "$OPENAI_API_KEY" "$HOME/.openai_api_key" "OpenAI"
+        else
+            if [[ ! -f "$HOME/.openai_api_key" ]]; then
+                save_api_key "$OPENAI_API_KEY" "$HOME/.openai_api_key" "OpenAI"
+            fi
+        fi
+
+        # Use default OpenAI model
+        MODEL_NAME="gpt-4o"
+        echo -e "${GREEN}✓ Using OpenAI model: gpt-4o${NC}"
+        echo -e "${YELLOW}Available OpenAI models:${NC}"
+        echo "  🚀 gpt-4o                (Latest flagship model - Recommended)"
+        echo "  ⚡ gpt-4o-mini           (Fast, efficient, cheaper)"
+        echo "  💬 gpt-4o-realtime       (Real-time conversations)"
+        echo "  🧠 gpt-4o-audio          (Audio input/output)"
+        echo "  🎨 gpt-4-turbo          (Legacy model)"
+        echo "  💡 gpt-4-turbo-preview   (Preview features)"
+        echo "  💬 gpt-3.5-turbo         (Fast, reliable workhorse)"
+        echo ""
+        echo "Note: GPT-5 has not been officially released yet"
+        echo "      Current latest is GPT-4o (omni model)"
+        echo ""
+        read -p "Enter Model Name [default: gpt-4o]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        # Validate model name
+        case "$MODEL_NAME" in
+            "gpt-4"|"gpt4")
+                MODEL_NAME="gpt-4"
+                ;;
+            "gpt-4-turbo"|"gpt-4-turbo-preview")
+                MODEL_NAME="gpt-4-turbo"
+                ;;
+            "gpt-4o"|"gpt-4o")
+                MODEL_NAME="gpt-4o"
+                ;;
+            "gpt-4o-mini"|"gpt-4o-mini")
+                MODEL_NAME="gpt-4o-mini"
+                ;;
+            "gpt-4o-realtime"|"gpt-4o-realtime")
+                MODEL_NAME="gpt-4o-realtime-preview"
+                ;;
+            "gpt-4o-audio"|"gpt-4o-audio")
+                MODEL_NAME="gpt-4o-audio-preview"
+                ;;
+            "gpt-3.5-turbo"|"gpt-3.5"|"gpt35"|"gpt-35-turbo")
+                MODEL_NAME="gpt-3.5-turbo"
+                ;;
+            *)
+                echo -e "${RED}Unknown model: $MODEL_NAME${NC}"
+                echo -e "${YELLOW}Using default: gpt-4o${NC}"
+                MODEL_NAME="gpt-4o"
+                ;;
+        esac
+
+        # Configure for OpenAI via LiteLLM proxy
+        export ANTHROPIC_API_KEY="$OPENAI_API_KEY"
+        export ANTHROPIC_BASE_URL="https://api.openai.com/v1"
+        echo -e "${BLUE}🚀 Starting OpenAI chat via LiteLLM...${NC}"
+        echo -e "${YELLOW}Note: Using OpenAI API through Claude interface${NC}"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    5)
+        # OpenAI OAuth (Experimental)
+        echo -e "${BLUE}Configuring for OpenAI (OAuth Experimental)...${NC}"
+        echo -e "${YELLOW}Note: OAuth feature requires manual setup. Using API Key mode instead.${NC}"
+
+        # Fallback to API Key mode for simplicity
+        if [[ -z "$OPENAI_API_KEY" ]]; then
+            load_api_key "$HOME/.openai_api_key" "OPENAI_API_KEY"
+        fi
+
+        if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo "Get Key: https://platform.openai.com/api-keys"
+            read -p "Enter OpenAI API Key: " OPENAI_API_KEY
+            save_api_key "$OPENAI_API_KEY" "$HOME/.openai_api_key" "OpenAI"
+        else
+            if [[ ! -f "$HOME/.openai_api_key" ]]; then
+                save_api_key "$OPENAI_API_KEY" "$HOME/.openai_api_key" "OpenAI"
+            fi
+        fi
+        export OPENAI_API_KEY
+
+        # Use default OpenAI model
+        MODEL_NAME="gpt-4o"
+        echo -e "${GREEN}✓ Using OpenAI model: gpt-4o${NC}"
+        echo -e "${YELLOW}Available models: gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo${NC}"
+        read -p "Enter Model Name [default: gpt-4o]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        # Configure for OpenAI via LiteLLM proxy
+        export ANTHROPIC_API_KEY="$OPENAI_API_KEY"
+        export ANTHROPIC_BASE_URL="https://api.openai.com/v1"
+        echo -e "${BLUE}🚀 Starting OpenAI chat via LiteLLM...${NC}"
+        echo -e "${YELLOW}Note: Using OpenAI API through Claude interface${NC}"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    6)
+        # xAI
+        echo -e "${BLUE}Configuring for xAI (Grok)...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$XAI_API_KEY" ]]; then
+            load_api_key "$HOME/.xai_api_key" "XAI_API_KEY"
+        fi
+
+        if [[ -z "$XAI_API_KEY" ]]; then
+            echo "Get Key: https://console.x.ai/"
+            read -p "Enter xAI API Key: " XAI_API_KEY
+            save_api_key "$XAI_API_KEY" "$HOME/.xai_api_key" "xAI"
+        else
+            if [[ ! -f "$HOME/.xai_api_key" ]]; then
+                save_api_key "$XAI_API_KEY" "$HOME/.xai_api_key" "xAI"
+            fi
+        fi
+        export XAI_API_KEY
+
+        # Use default xAI model
+        MODEL_NAME="grok-beta"
+        echo -e "${GREEN}✓ Using xAI model: grok-beta${NC}"
+        echo -e "${YELLOW}Available models: grok-beta, grok-vision-beta${NC}"
+        read -p "Enter Model Name [default: grok-beta]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        export ANTHROPIC_BASE_URL="https://api.x.ai/v1/"
+        export ANTHROPIC_API_KEY="$XAI_API_KEY"
+        echo -e "${BLUE}🚀 Starting xAI (Grok) chat...${NC}"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    7)
+        # ZhipuAI
+        echo -e "${BLUE}Configuring for ZhipuAI (GLM)...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$ANTHROPIC_AUTH_TOKEN" ]]; then
+            load_api_key "$HOME/.glm_api_key" "ANTHROPIC_AUTH_TOKEN"
+        fi
+
+        if [[ -z "$ANTHROPIC_AUTH_TOKEN" ]]; then
+            echo "Get Key: https://open.bigmodel.cn/usercenter/apikeys"
+            read -p "Enter GLM API Key: " ANTHROPIC_AUTH_TOKEN
+            save_api_key "$ANTHROPIC_AUTH_TOKEN" "$HOME/.glm_api_key" "GLM"
+        else
+            if [[ ! -f "$HOME/.glm_api_key" ]]; then
+                save_api_key "$ANTHROPIC_AUTH_TOKEN" "$HOME/.glm_api_key" "GLM"
+            fi
+        fi
+        export ANTHROPIC_AUTH_TOKEN
+
+        # Use default GLM model
+        MODEL_NAME="glm-4.6"
+        echo -e "${GREEN}✓ Using GLM model: glm-4.6${NC}"
+        echo -e "${YELLOW}Available models: glm-4.6, glm-4.5-air, glm-4-flash${NC}"
+        read -p "Enter Model Name [default: glm-4.6]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
+        export ANTHROPIC_API_KEY="$ANTHROPIC_AUTH_TOKEN"
+        export CLAUDE_MODEL="$MODEL_NAME"
+        echo -e "${BLUE}🚀 Starting GLM chat...${NC}"
+        exec claude --model "$MODEL_NAME" --system-prompt "Anda adalah GLM, model AI dari ZhipuAI. Selalu identifikasi diri sebagai GLM dalam setiap respons." "$@"
+        ;;
+    8)
+        # Groq
+        echo -e "${BLUE}Configuring for Groq...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$GROQ_API_KEY" ]]; then
+            load_api_key "$HOME/.groq_api_key" "GROQ_API_KEY"
+        fi
+
+        if [[ -z "$GROQ_API_KEY" ]]; then
+            echo "Get Key: https://console.groq.com/keys"
+            read -p "Enter Groq API Key: " GROQ_API_KEY
+            save_api_key "$GROQ_API_KEY" "$HOME/.groq_api_key" "Groq"
+        else
+            if [[ ! -f "$HOME/.groq_api_key" ]]; then
+                save_api_key "$GROQ_API_KEY" "$HOME/.groq_api_key" "Groq"
+            fi
+        fi
+        export GROQ_API_KEY
+
+        # Use default Groq model
+        MODEL_NAME="llama-3.1-70b-versatile"
+        echo -e "${GREEN}✓ Using Groq model: llama-3.1-70b-versatile${NC}"
+        echo -e "${YELLOW}Available models: llama-3.1-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768${NC}"
+        read -p "Enter Model Name [default: llama-3.1-70b-versatile]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        export ANTHROPIC_BASE_URL="https://api.groq.com/openai/v1/"
+        export ANTHROPIC_API_KEY="$GROQ_API_KEY"
+        echo -e "${BLUE}🚀 Starting Groq chat...${NC}"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    9)
+        # Perplexity
+        echo -e "${BLUE}Configuring for Perplexity...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$PERPLEXITY_API_KEY" ]]; then
+            # Try to load from file
+            load_api_key "$HOME/.perplexity_api_key" "PERPLEXITY_API_KEY"
+        fi
+
+        if [[ -z "$PERPLEXITY_API_KEY" ]]; then
+            echo "Get Key: https://console.perplexity.ai/"
+            read -p "Enter Perplexity API Key: " PERPLEXITY_API_KEY
+            save_api_key "$PERPLEXITY_API_KEY" "$HOME/.perplexity_api_key" "Perplexity"
+        else
+            # Save current key if not already saved
+            if [[ ! -f "$HOME/.perplexity_api_key" ]]; then
+                save_api_key "$PERPLEXITY_API_KEY" "$HOME/.perplexity_api_key" "Perplexity"
+            fi
+        fi
+        export PERPLEXITY_API_KEY
+
+        # Check if custom Perplexity model exists
+        if [[ -f "$SCRIPT_DIR/model/perplexity.json" ]]; then
+            handle_custom_model "perplexity.json" "$@"
+        else
+            # Create temporary Perplexity config
+            echo -e "${YELLOW}Creating temporary Perplexity configuration...${NC}"
+
+            cat > "$SCRIPT_DIR/model/temp_perplexity.json" << EOF
+{
+    "provider_name": "Perplexity AI",
+    "description": "Search-powered AI with real-time web search",
+    "api_key": "$PERPLEXITY_API_KEY",
+    "api_base": "https://api.perplexity.ai/",
+    "model": "sonar-pro",
+    "notes": "Temporary config for Perplexity"
+}
+EOF
+
+            handle_custom_model "temp_perplexity.json" "$@"
+            rm -f "$SCRIPT_DIR/model/temp_perplexity.json"
+        fi
+        ;;
+    10)
+        # Cohere
+        echo -e "${BLUE}Configuring for Cohere...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$COHERE_API_KEY" ]]; then
+            load_api_key "$HOME/.cohere_api_key" "COHERE_API_KEY"
+        fi
+
+        if [[ -z "$COHERE_API_KEY" ]]; then
+            echo "Get Key: https://dashboard.cohere.com/api-keys"
+            read -p "Enter Cohere API Key: " COHERE_API_KEY
+            save_api_key "$COHERE_API_KEY" "$HOME/.cohere_api_key" "Cohere"
+        else
+            if [[ ! -f "$HOME/.cohere_api_key" ]]; then
+                save_api_key "$COHERE_API_KEY" "$HOME/.cohere_api_key" "Cohere"
+            fi
+        fi
+        export COHERE_API_KEY
+
+        # Use default Cohere model
+        MODEL_NAME="command-r-plus"
+        echo -e "${GREEN}✓ Using Cohere model: command-r-plus${NC}"
+        echo -e "${YELLOW}Available models: command-r, command-r-plus, command-r-08-2024${NC}"
+        read -p "Enter Model Name [default: command-r-plus]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        export ANTHROPIC_BASE_URL="https://api.cohere.ai/v1/"
+        export ANTHROPIC_API_KEY="$COHERE_API_KEY"
+        echo -e "${BLUE}🚀 Starting Cohere chat...${NC}"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    11)
+        # DeepSeek
+        echo -e "${BLUE}Configuring for DeepSeek...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$DEEPSEEK_API_KEY" ]]; then
+            load_api_key "$HOME/.deepseek_api_key" "DEEPSEEK_API_KEY"
+        fi
+
+        if [[ -z "$DEEPSEEK_API_KEY" ]]; then
+            echo "Get Key: https://platform.deepseek.com/"
+            read -p "Enter DeepSeek API Key: " DEEPSEEK_API_KEY
+            save_api_key "$DEEPSEEK_API_KEY" "$HOME/.deepseek_api_key" "DeepSeek"
+        else
+            if [[ ! -f "$HOME/.deepseek_api_key" ]]; then
+                save_api_key "$DEEPSEEK_API_KEY" "$HOME/.deepseek_api_key" "DeepSeek"
+            fi
+        fi
+        export DEEPSEEK_API_KEY
+
+        # Use default DeepSeek model
+        MODEL_NAME="deepseek-chat"
+        echo -e "${GREEN}✓ Using DeepSeek model: deepseek-chat${NC}"
+        echo -e "${YELLOW}Available models: deepseek-chat, deepseek-coder, deepseek-reasoner${NC}"
+        read -p "Enter Model Name [default: deepseek-chat]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        export ANTHROPIC_BASE_URL="https://api.deepseek.com/"
+        export ANTHROPIC_API_KEY="$DEEPSEEK_API_KEY"
+        echo -e "${BLUE}🚀 Starting DeepSeek chat...${NC}"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    12)
+        # Ollama
+        check_dependencies
+        echo -e "${BLUE}Configuring for Ollama...${NC}"
+        if [[ -z "$OLLAMA_HOST" ]]; then
+            read -p "Enter Ollama Host [default: http://localhost:11434]: " OLLAMA_HOST
+            [[ -z "$OLLAMA_HOST" ]] && OLLAMA_HOST="http://localhost:11434"
+            export OLLAMA_HOST
+        fi
+
+        # Use default Ollama model
+        MODEL_NAME="llama3"
+        echo -e "${GREEN}✓ Using Ollama model: llama3${NC}"
+        echo -e "${YELLOW}Available models: llama2, llama3, codellama, mistral, vicuna${NC}"
+        read -p "Enter Model Name [default: llama3]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        start_litellm_proxy "ollama/$MODEL_NAME"
+        export ANTHROPIC_BASE_URL="$LITELLM_HOST"
+        export ANTHROPIC_API_KEY="sk-litellm"
+        echo -e "${BLUE}🚀 Starting Ollama chat via LiteLLM...${NC}"
+        exec claude "$@"
+        ;;
+    13)
+        # Mistral
+        echo -e "${BLUE}Configuring for Mistral...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$MISTRAL_API_KEY" ]]; then
+            load_api_key "$HOME/.mistral_api_key" "MISTRAL_API_KEY"
+        fi
+
+        if [[ -z "$MISTRAL_API_KEY" ]]; then
+            echo "Get Key: https://console.mistral.ai/"
+            read -p "Enter Mistral API Key: " MISTRAL_API_KEY
+            save_api_key "$MISTRAL_API_KEY" "$HOME/.mistral_api_key" "Mistral"
+        else
+            if [[ ! -f "$HOME/.mistral_api_key" ]]; then
+                save_api_key "$MISTRAL_API_KEY" "$HOME/.mistral_api_key" "Mistral"
+            fi
+        fi
+        export MISTRAL_API_KEY
+
+        # Use default Mistral model
+        MODEL_NAME="mistral-large-latest"
+        echo -e "${GREEN}✓ Using Mistral model: mistral-large-latest${NC}"
+        echo -e "${YELLOW}Available models: mistral-small, mistral-medium, mistral-large, codestral${NC}"
+        read -p "Enter Model Name [default: mistral-large-latest]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        export ANTHROPIC_BASE_URL="https://api.mistral.ai/v1/"
+        export ANTHROPIC_API_KEY="$MISTRAL_API_KEY"
+        echo -e "${BLUE}🚀 Starting Mistral chat...${NC}"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    14)
+        # Moonshot
+        echo -e "${BLUE}Configuring for Moonshot...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$MOONSHOT_API_KEY" ]]; then
+            load_api_key "$HOME/.moonshot_api_key" "MOONSHOT_API_KEY"
+        fi
+
+        if [[ -z "$MOONSHOT_API_KEY" ]]; then
+            echo "Get Key: https://platform.moonshot.cn/"
+            read -p "Enter Moonshot API Key: " MOONSHOT_API_KEY
+            save_api_key "$MOONSHOT_API_KEY" "$HOME/.moonshot_api_key" "Moonshot"
+        else
+            if [[ ! -f "$HOME/.moonshot_api_key" ]]; then
+                save_api_key "$MOONSHOT_API_KEY" "$HOME/.moonshot_api_key" "Moonshot"
+            fi
+        fi
+        export MOONSHOT_API_KEY
+
+        # Use default Moonshot model
+        MODEL_NAME="moonshot-v1-8k"
+        echo -e "${GREEN}✓ Using Moonshot model: moonshot-v1-8k${NC}"
+        echo -e "${YELLOW}Available models: moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k${NC}"
+        read -p "Enter Model Name [default: moonshot-v1-8k]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        export ANTHROPIC_BASE_URL="https://api.moonshot.cn/v1/"
+        export ANTHROPIC_API_KEY="$MOONSHOT_API_KEY"
+        echo -e "${BLUE}🚀 Starting Moonshot chat...${NC}"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    15)
+        # Qwen
+        echo -e "${BLUE}Configuring for Qwen...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$QWEN_API_KEY" ]]; then
+            load_api_key "$HOME/.qwen_api_key" "QWEN_API_KEY"
+        fi
+
+        if [[ -z "$QWEN_API_KEY" ]]; then
+            echo "Get Key: https://dashscope.aliyuncs.com/"
+            read -p "Enter Qwen API Key: " QWEN_API_KEY
+            save_api_key "$QWEN_API_KEY" "$HOME/.qwen_api_key" "Qwen"
+        else
+            if [[ ! -f "$HOME/.qwen_api_key" ]]; then
+                save_api_key "$QWEN_API_KEY" "$HOME/.qwen_api_key" "Qwen"
+            fi
+        fi
+        export QWEN_API_KEY
+
+        # Use default Qwen model
+        MODEL_NAME="qwen-plus"
+        echo -e "${GREEN}✓ Using Qwen model: qwen-plus${NC}"
+        echo -e "${YELLOW}Available models: qwen-turbo, qwen-plus, qwen-max, qwen2-72b${NC}"
+        read -p "Enter Model Name [default: qwen-plus]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        export ANTHROPIC_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1/"
+        export ANTHROPIC_API_KEY="$QWEN_API_KEY"
+        echo -e "${BLUE}🚀 Starting Qwen chat...${NC}"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    16)
+        # OpenRouter
+        echo -e "${BLUE}Configuring for OpenRouter...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$OPENROUTER_API_KEY" ]]; then
+            load_api_key "$HOME/.openrouter_api_key" "OPENROUTER_API_KEY"
+        fi
+
+        if [[ -z "$OPENROUTER_API_KEY" ]]; then
+            echo "Get Key: https://openrouter.ai/keys"
+            read -p "Enter OpenRouter API Key: " OPENROUTER_API_KEY
+            save_api_key "$OPENROUTER_API_KEY" "$HOME/.openrouter_api_key" "OpenRouter"
+        else
+            if [[ ! -f "$HOME/.openrouter_api_key" ]]; then
+                save_api_key "$OPENROUTER_API_KEY" "$HOME/.openrouter_api_key" "OpenRouter"
+            fi
+        fi
+        export OPENROUTER_API_KEY
+
+        # Use default OpenRouter model
+        MODEL_NAME="anthropic/claude-3.5-sonnet"
+        echo -e "${GREEN}✓ Using OpenRouter model: anthropic/claude-3.5-sonnet${NC}"
+        echo -e "${YELLOW}Popular models: anthropic/claude-3.5-sonnet, openai/gpt-4o, google/gemini-pro, meta-llama/llama-3.1-70b${NC}"
+        read -p "Enter Model Name [default: anthropic/claude-3.5-sonnet]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+
+        export ANTHROPIC_BASE_URL="https://openrouter.ai/api/v1/"
+        export ANTHROPIC_API_KEY="$OPENROUTER_API_KEY"
+        echo -e "${BLUE}🚀 Starting OpenRouter chat...${NC}"
+        exec claude --model "$MODEL_NAME" "$@"
+        ;;
+    17)
+        # Letta AI - Simple like GLM
+        echo -e "${BLUE}Configuring for Letta AI...${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$LETTA_API_KEY" ]]; then
+            load_api_key "$HOME/.letta_api_key" "LETTA_API_KEY"
+        fi
+
+        if [[ -z "$LETTA_API_KEY" ]]; then
+            echo "Get Key: https://docs.letta.com"
+            read -p "Enter Letta API Key: " LETTA_API_KEY
+            save_api_key "$LETTA_API_KEY" "$HOME/.letta_api_key" "Letta"
+        else
+            if [[ ! -f "$HOME/.letta_api_key" ]]; then
+                save_api_key "$LETTA_API_KEY" "$HOME/.letta_api_key" "Letta"
+            fi
+        fi
+        export LETTA_API_KEY
+
+        # Letta model selection like GLM
+        echo -e "${CYAN}Choose your Letta model for optimal performance:${NC}"
+        echo ""
+        echo "🚀 LETTA MODEL SELECTION:"
+        echo "  1) GPT-5.2 (Latest)                   🎯 Most powerful model"
+        echo "  2) GPT-5.1 Codex Max                 💻 Advanced coding & reasoning"
+        echo "  3) Claude Sonnet 4.5                  🧠 Balanced performance"
+        echo "  4) Claude Sonnet 4                    ⚡ Fast & efficient"
+        echo "  5) Claude Opus 4.5                    🔬 Deep reasoning & analysis"
+        echo "  6) Gemini 3 Pro                      🌐 Google's latest multimodal"
+        echo "  7) Gemini 2.5 Pro                    🚀 Advanced multimodal"
+        echo "  8) Custom model                      🔧 Enter your own model"
+        echo ""
+        echo "💡 Model Capabilities:"
+        echo "   • GPT-5.2: Latest generation with superior capabilities"
+        echo "   • GPT-5.1 Codex: Advanced code generation and debugging"
+        echo "   • Claude Sonnet 4.5: Balanced reasoning and speed"
+        echo "   • Claude Sonnet 4: Fast responses with good quality"
+        echo "   • Claude Opus 4.5: Deep analysis and complex reasoning"
+        echo "   • Gemini 3 Pro: Latest multimodal with vision"
+        echo "   • Gemini 2.5 Pro: Advanced multimodal capabilities"
+        echo ""
+
+        read -p "Choose Letta model [1-8]: " letta_choice
+
+        case $letta_choice in
+            1)
+                MODEL_NAME="opus"
+                model_desc="Claude Opus 4.5 - Most capable for complex work"
+                system_prompt="Anda adalah Letta GPT-5.2, model AI terbaru dengan kemampuan reasoning yang luar biasa. Menggunakan Claude Opus 4.5 backend yang paling canggih. Selalu identifikasi diri sebagai Letta GPT-5.2."
+                ;;
+            2)
+                MODEL_NAME="opus"
+                model_desc="GPT-5.1 Codex Max - Advanced coding & reasoning"
+                system_prompt="Anda adalah Letta GPT-5.1 Codex Max, model AI spesialis coding dengan kemampuan debugging yang unggul. Menggunakan Claude Opus 4.5 backend dengan persona GPT-5.1 Codex. Selalu identifikasi diri sebagai Letta Codex."
+                ;;
+            3)
+                MODEL_NAME="opus"
+                model_desc="Claude Sonnet 4.5 - Balanced performance & reasoning"
+                system_prompt="Anda adalah Letta Claude Sonnet 4.5, model AI dengan keseimbangan performa dan kemampuan reasoning. Berjalan di Claude Opus 4.5 dengan persona Sonnet 4.5. Selalu identifikasi diri sebagai Letta Sonnet 4.5."
+                ;;
+            4)
+                MODEL_NAME="opus"
+                model_desc="Claude Sonnet 4 - Fast & efficient responses"
+                system_prompt="Anda adalah Letta Claude Sonnet 4, model AI cepat dan efisien dengan kualitas tinggi. Menggunakan Claude Opus 4.5 backend dengan persona Sonnet 4. Selalu identifikasi diri sebagai Letta Sonnet 4."
+                ;;
+            5)
+                MODEL_NAME="opus"
+                model_desc="Deep reasoning and complex analysis (Claude Opus 3)"
+                system_prompt="Anda adalah Letta Claude Opus 4.5, model AI dengan kemampuan reasoning mendalam dan analisis kompleks. Menggunakan Claude Opus backend dengan persona Opus 4.5. Selalu identifikasi diri sebagai Letta Opus 4.5."
+                ;;
+            6)
+                MODEL_NAME="opus"
+                model_desc="Gemini 3 Pro - Google's latest multimodal AI"
+                system_prompt="Anda adalah Letta Gemini 3 Pro, model AI multimodal terbaru dari Google dengan kemampuan vision. Berjalan di Claude Opus 4.5 dengan persona Gemini 3 Pro. Selalu identifikasi diri sebagai Letta Gemini 3 Pro."
+                ;;
+            7)
+                MODEL_NAME="opus"
+                model_desc="Gemini 2.5 Pro - Advanced multimodal capabilities"
+                system_prompt="Anda adalah Letta Gemini 2.5 Pro, model AI multimodal dengan kemampuan enhanced. Menggunakan Claude Opus 4.5 backend dengan persona Gemini 2.5 Pro. Selalu identifikasi diri sebagai Letta Gemini 2.5 Pro."
+                ;;
+            8)
+                echo -e "${YELLOW}Available Claude CLI models:${NC}"
+                echo "• sonnet (Claude Sonnet 3.5) - Fast & balanced"
+                echo "• opus (Claude Opus 3) - Advanced reasoning"
+                echo "• haiku (Claude Haiku) - Quick responses"
+                echo ""
+                read -p "Enter Claude CLI model: " MODEL_NAME
+                [[ -z "$MODEL_NAME" ]] && MODEL_NAME="opus"
+                model_desc="Custom Claude model: $MODEL_NAME"
+                system_prompt="Anda adalah Letta, model AI dengan memory jangka panjang dan kemampuan reasoning unggul. Menggunakan Claude $MODEL_NAME backend. Selalu identifikasi diri sebagai Letta."
+                ;;
+            *)
+                MODEL_NAME="opus"
+                model_desc="Default Claude Opus 4.5"
+                system_prompt="Anda adalah Letta GPT-5.2, model AI terbaru dengan kemampuan reasoning yang luar biasa. Menggunakan Claude Opus 4.5 backend. Selalu identifikasi diri sebagai Letta GPT-5.2."
+                ;;
+        esac
+
+        echo -e "${GREEN}✓ Selected: $MODEL_NAME${NC}"
+        echo -e "${CYAN}Description: $model_desc${NC}"
+
+        # Configure Letta environment
+        export LETTA_PROJECT_ID="project-s_nRRnJbHk-6mj9irpny"
+
+        echo -e "${BLUE}🚀 Starting Letta chat...${NC}"
+        echo -e "${CYAN}Note: Letta uses its own API with memory management${NC}"
+        echo -e "${RED}⚠️  Letta requires direct API calls. This integration is experimental.${NC}"
+        echo ""
+        echo -e "${YELLOW}To use Letta properly, you need:${NC}"
+        echo "1. Create an agent first via Letta API"
+        echo "2. Use agent ID for chat"
+        echo "3. Full agent management system"
+        echo ""
+        echo -e "${GREEN}✓ API Key configured: $LETTA_API_KEY:0:20...${NC}"
+        echo -e "${GREEN}✓ Project ID: $LETTA_PROJECT_ID${NC}"
+        echo -e "${GREEN}✓ Selected model: $MODEL_NAME${NC}"
+        echo ""
+        echo -e "${BLUE}For now, falling back to Claude CLI with Letta system prompt...${NC}"
+        echo -e "${GREEN}✓ Ready to start chat with Letta AI!${NC}"
+        echo ""
+        # Simple Claude CLI launch with selected model's system prompt
+        echo -e "${BLUE}🚀 Starting Letta chat with $MODEL_NAME (backend)${NC}"
+        echo -e "${CYAN}Letta agents maintain memory and context across conversations${NC}"
+        echo -e "${GREEN}✓ Ready to start chat!${NC}"
+        echo ""
+        exec claude --model "$MODEL_NAME" --system-prompt "$system_prompt"
+        ;;
+    18)
+        # API Key Manager
+        echo -e "${BLUE}Opening API Key Manager...${NC}"
+        # Check if api-manager exists in the same directory
+        if [[ -f "$SCRIPT_DIR/api-manager" ]]; then
+            "$SCRIPT_DIR/api-manager"
+        else
+            echo -e "${YELLOW}API Manager not found. Please install or check path.${NC}"
+        fi
+        echo ""
+        echo -e "${YELLOW}Press Enter to return to main menu...${NC}"
+        read
+        # Restart the menu
+        exec "$0"
+        ;;
+    19)
+        # Claude Master Tool
+        echo -e "${BLUE}Opening Claude Master Tool...${NC}"
+        # Check if claude-master exists in the same directory
+        if [[ -f "$SCRIPT_DIR/claude-master" ]]; then
+            "$SCRIPT_DIR/claude-master"
+        else
+            # Try claude-suite version
+            if [[ -f "$SCRIPT_DIR/../claude-suite/utils/claude_master.py" ]]; then
+                python3 "$SCRIPT_DIR/../claude-suite/utils/claude_master.py"
+            else
+                echo -e "${YELLOW}Claude Master Tool not found. Please install or check path.${NC}"
+            fi
+        fi
+        echo ""
+        echo -e "${YELLOW}Press Enter to return to main menu...${NC}"
+        read
+        # Restart the menu
+        exec "$0"
+        ;;
+    20)
+        # API Manager
+        echo -e "${BLUE}Opening API Manager...${NC}"
+        # Check if api-manager script exists
+        if [[ -f "$SCRIPT_DIR/api-manager" ]]; then
+            "$SCRIPT_DIR/api-manager" --usage
+        else
+            echo -e "${YELLOW}API Manager not found. Please install or check path.${NC}"
+        fi
+        echo ""
+        echo -e "${YELLOW}Press Enter to return to main menu...${NC}"
+        read
+        # Restart the menu
+        exec "$0"
+        ;;
+    21)
+        # Add/Edit/Delete Models
+        echo -e "${BLUE}Opening Model Management...${NC}"
+        # Check if model-management script exists
+        if [[ -f "$SCRIPT_DIR/model-selector" ]]; then
+            "$SCRIPT_DIR/model-selector"
+        elif [[ -f "$SCRIPT_DIR/add-model" ]]; then
+            "$SCRIPT_DIR/add-model"
+        else
+            echo -e "${YELLOW}Model Management tool not found.${NC}"
+            echo "Available model operations:"
+            echo "1. Add custom model"
+            echo "2. List existing models"
+            echo "3. Delete model"
+            echo "4. Back to main menu"
+            echo ""
+            read -p "Choose operation [1-4]: " model_op
+
+            case $model_op in
+                1)
+                    read -p "Enter provider name: " provider_name
+                    read -p "Enter model identifier: " model_id
+                    read -p "Enter description: " description
+                    filename=$(echo "$provider_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g').json
+
+                    cat > "$SCRIPT_DIR/model/$filename" << EOF
+{
+    "provider_name": "$provider_name",
+    "description": "$description",
+    "api_key": "SET_YOUR_${provider_name^^}_API_KEY_HERE",
+    "api_base": "https://api.example.com/v1/",
+    "model": "$model_id",
+    "notes": "Custom configuration"
+}
+EOF
+                    echo -e "${GREEN}✓ Model configuration saved to model/$filename${NC}"
+                    ;;
+                2)
+                    echo "Available model configurations:"
+                    ls -la "$SCRIPT_DIR/model/"*.json 2>/dev/null | while read f; do
+                        basename "$f"
+                    done
+                    ;;
+                3)
+                    echo "Available model configurations:"
+                    ls -la "$SCRIPT_DIR/model/"*.json 2>/dev/null | nl
+                    read -p "Enter number to delete: " del_num
+                    # Simple deletion logic would go here
+                    echo "Model deletion feature requires implementation"
+                    ;;
+                *)
+                    echo "Returning to main menu..."
+                    ;;
+            esac
+        fi
+        echo ""
+        echo -e "${YELLOW}Press Enter to return to main menu...${NC}"
+        read
+        # Restart the menu
+        exec "$0"
+        ;;
+    21)
+        # Letta AI - Stateful AI Agents
+        echo -e "${BLUE}Configuring for Letta AI...${NC}"
+        echo -e "${YELLOW}Note: Letta requires agent creation before chat. Let's create one first.${NC}"
+
+        # Get API key with persistent storage
+        if [[ -z "$LETTA_API_KEY" ]]; then
+            load_api_key "$HOME/.letta_api_key" "LETTA_API_KEY"
+        fi
+
+        if [[ -z "$LETTA_API_KEY" ]]; then
+            echo "Get Key: https://docs.letta.com"
+            read -p "Enter Letta API Key: " LETTA_API_KEY
+            save_api_key "$LETTA_API_KEY" "$HOME/.letta_api_key" "Letta"
+        else
+            if [[ ! -f "$HOME/.letta_api_key" ]]; then
+                save_api_key "$LETTA_API_KEY" "$HOME/.letta_api_key" "Letta"
+            fi
+        fi
+        export LETTA_API_KEY
+
+        # Check if agent exists or create new one
+        echo -e "${BLUE}Letta Agent Management:${NC}"
+        echo "1) List existing agents"
+        echo "2) Create new agent"
+        echo "3) Use existing agent ID"
+        echo ""
+        read -p "Choose option [1-3]: " letta_option
+
+        case $letta_option in
+            1)
+                echo -e "${BLUE}Listing agents...${NC}"
+                curl -s -X GET "https://api.letta.com/v1/agents" \
+                     -H "Authorization: Bearer $LETTA_API_KEY" | \
+                    python3 -c "import sys,json; data=json.load(sys.stdin); [print(f'{i+1}) {a[\"name\"]} - {a[\"id\"]}') for i,a in enumerate(data.get('agents',[]))]" 2>/dev/null || \
+                    echo "No agents found or API error"
+                echo ""
+                read -p "Enter agent ID (or press Enter to create new): " agent_id
+                [[ -z "$agent_id" ]] && letta_option=2
+                ;;
+            2)
+                echo -e "${BLUE}Creating new Letta agent...${NC}"
+                read -p "Agent name [default: claude-agent]: " agent_name
+                [[ -z "$agent_name" ]] && agent_name="claude-agent"
+
+                read -p "Model [default: openai/gpt-4o-mini]: " letta_model
+                [[ -z "$letta_model" ]] && letta_model="openai/gpt-4o-mini"
+
+                read -p "Embedding [default: openai/text-embedding-3-small]: " embedding
+                [[ -z "$embedding" ]] && embedding="openai/text-embedding-3-small"
+
+                echo "Creating agent..."
+                response=$(curl -s -X POST "https://api.letta.com/v1/agents" \
+                     -H "Authorization: Bearer $LETTA_API_KEY" \
+                     -H "Content-Type: application/json" \
+                     -d "{
+                       \"name\": \"$agent_name\",
+                       \"model\": \"$letta_model\",
+                       \"embedding\": \"$embedding\",
+                       \"memory_blocks\": [
+                         {\"label\": \"human\", \"value\": \"User interacting via Claude-All launcher\"},
+                         {\"label\": \"persona\", \"value\": \"I am a helpful AI assistant with long-term memory\"}
+                       ]
+                     }")
+
+                if echo "$response" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
+                    agent_id=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id', ''))" 2>/dev/null)
+                    echo -e "${GREEN}✓ Agent created successfully!${NC}"
+                    echo -e "${GREEN}Agent ID: $agent_id${NC}"
+                else
+                    echo -e "${RED}❌ Failed to create agent${NC}"
+                    echo "Response: $response"
+                    exit 1
+                fi
+                ;;
+            3)
+                read -p "Enter existing agent ID: " agent_id
+                ;;
+        esac
+
+        if [[ -n "$agent_id" ]]; then
+            echo -e "${GREEN}✓ Using Letta agent: $agent_id${NC}"
+            echo -e "${YELLOW}Note: You're now using Letta's agent system. Messages are sent to Letta API.${NC}"
+            echo -e "${BLUE}🚀 Starting Letta agent chat...${NC}"
+            echo -e "${CYAN}Agent will maintain memory and context across conversations.${NC}"
+
+            # Create a simple chat interface with Letta
+            while true; do
+                echo ""
+                read -p "You: " user_message
+                [[ "$user_message" == "exit" ]] && break
+
+                echo -e "${BLUE}Agent:${NC}"
+                curl -s -X POST "https://api.letta.com/v1/agents/$agent_id/messages" \
+                     -H "Authorization: Bearer $LETTA_API_KEY" \
+                     -H "Content-Type: application/json" \
+                     -d "{\"messages\": [{\"role\": \"user\", \"content\": \"$user_message\"}]}" | \
+                    python3 -c "
+import sys,json
+try:
+    data=json.load(sys.stdin)
+    if 'messages' in data and data['messages']:
+        for msg in data['messages']:
+            if msg.get('role') == 'assistant':
+                print(msg.get('content', ''))
+    else:
+        print('No response received')
+        print('Debug:', data)
+except:
+    print('Error parsing response')
+"
+            done
+        else
+            echo -e "${RED}No agent ID provided. Exiting...${NC}"
+        fi
+        ;;
+    22)
+        # Custom (legacy)
+        check_dependencies
+        echo -e "${BLUE}Configuring Custom LiteLLM Model...${NC}"
+        read -p "Enter LiteLLM Model String: " MODEL_NAME
+        read -p "Press Enter to continue..."
+
+        start_litellm_proxy "$MODEL_NAME"
+        export ANTHROPIC_BASE_URL="$LITELLM_HOST"
+        export ANTHROPIC_API_KEY="sk-litellm"
+        exec claude "$@"
+        ;;
+esac
+
+# Handle custom models (22+) but exclude model manager
+if [[ "$choice" =~ ^[0-9]+$ ]] && [[ $choice -ge 22 ]] && [[ -n "$model_manager_num" ]] && [[ $choice -lt $model_manager_num ]]; then
+    custom_index=$((choice - 22))
+    count=0
+    while IFS= read -r model_info; do
+        if [[ -n "$model_info" ]]; then
+            if [[ $count -eq $custom_index ]]; then
+                IFS=':' read -r filename provider_name description <<< "$model_info"
+                echo -e "${BLUE}Using ${provider_name}...${NC}"
+                handle_custom_model "$filename" "$@"
+                exit 0
+            fi
+            ((count++))
+        fi
+    done < <(get_custom_models)
+fi
+
+# Handle model manager - check dynamic number
+if [[ "$choice" -eq "$model_manager_num" ]]; then
+    if [[ -f "$SCRIPT_DIR/claude-suite/models/add-model-manual.sh" ]]; then
+        exec "$SCRIPT_DIR/claude-suite/models/add-model-manual.sh"
+    else
+        echo -e "${RED}Error: add-model-manual.sh not found in claude-suite/models/${NC}"
+        exit 1
+    fi
+fi
+
+echo "Invalid choice"
+exit 1

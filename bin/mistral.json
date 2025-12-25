@@ -1,0 +1,7 @@
+{
+    "provider_name": "Mistral AI",
+    "description": "European AI models",
+    "api_key": "xxxxxxxx",
+    "api_base": "https://api.mistral.ai/",
+    "model": "mistral-large-latest"
+}

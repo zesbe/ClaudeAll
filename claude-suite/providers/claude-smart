@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+
+# Smart Claude Launcher with GLM Auto-Switch
+# Cross-platform: Linux, Termux, macOS, Windows (Git Bash/WSL)
+# Usage: claude-smart
+
+# Platform detection
+detect_platform() {
+    case "$(uname -s)" in
+        Linux*)     echo "Linux";;
+        Darwin*)    echo "macOS";;
+        CYGWIN*|MINGW*|MSYS*) echo "Windows";;
+        *)          echo "Linux";;
+    esac
+}
+
+PLATFORM=$(detect_platform)
+
+# Colors - Support both Linux/macOS and Windows
+if [[ "$PLATFORM" == "Windows" ]]; then
+    if command -v tput &> /dev/null; then
+        GREEN=$(tput setaf 2 2>/dev/null || echo "")
+        BLUE=$(tput setaf 4 2>/dev/null || echo "")
+        RED=$(tput setaf 1 2>/dev/null || echo "")
+        YELLOW=$(tput setaf 3 2>/dev/null || echo "")
+        NC=$(tput sgr0 2>/dev/null || echo "")
+    else
+        GREEN=''
+        BLUE=''
+        RED=''
+        YELLOW=''
+        NC=''
+    fi
+else
+    GREEN='\033[0;32m'
+    BLUE='\033[0;34m'
+    RED='\033[0;31m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m'
+fi
+
+# Portable home directory
+if [[ -n "$HOME" ]]; then
+    USER_HOME="$HOME"
+elif [[ -n "$USERPROFILE" ]]; then
+    USER_HOME="$USERPROFILE"
+else
+    USER_HOME="$HOME"
+fi
+
+GLM_API_KEY_FILE="$USER_HOME/.glm_api_key"
+
+# Default to Anthropic
+CURRENT_PROVIDER="anthropic"
+MODEL_NAME=""
+
+# Parse arguments to detect model
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --model)
+            MODEL_NAME="$2"
+            # Check if it's a GLM model
+            if [[ "$MODEL_NAME" == *"glm"* ]]; then
+                CURRENT_PROVIDER="glm"
+            fi
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+# If no model specified, start interactive selection
+if [[ -z "$MODEL_NAME" ]]; then
+    echo -e "${BLUE}=== AI Model Selection ===${NC}"
+    echo ""
+    echo "ANTHROPIC MODELS:"
+    echo "1) claude-3-5-sonnet-latest (Smartest)"
+    echo "2) claude-3-haiku-latest (Fast)"
+    echo ""
+    echo "GLM MODELS:"
+    echo "3) glm-4.6 (GLM Flagship)"
+    echo "4) glm-4.5-air (GLM Fast)"
+    echo ""
+    read -p "Select model [1-4]: " choice
+
+    case $choice in
+        1) MODEL_NAME="claude-3-5-sonnet-latest"; CURRENT_PROVIDER="anthropic" ;;
+        2) MODEL_NAME="claude-3-haiku-latest"; CURRENT_PROVIDER="anthropic" ;;
+        3) MODEL_NAME="glm-4.6"; CURRENT_PROVIDER="glm" ;;
+        4) MODEL_NAME="glm-4.5-air"; CURRENT_PROVIDER="glm" ;;
+        *) MODEL_NAME="claude-3-5-sonnet-latest"; CURRENT_PROVIDER="anthropic" ;;
+    esac
+fi
+
+# Configure based on provider
+if [[ "$CURRENT_PROVIDER" == "glm" ]]; then
+    # GLM Mode
+    if [[ -f "$GLM_API_KEY_FILE" ]]; then
+        API_KEY=$(cat "$GLM_API_KEY_FILE" 2>/dev/null)
+        export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
+        export ANTHROPIC_API_KEY="$API_KEY"
+        export ANTHROPIC_AUTH_TOKEN="$API_KEY"
+        echo -e "${GREEN}✓ Using GLM endpoint: $MODEL_NAME${NC}"
+    else
+        echo -e "${RED}No GLM API key found. Run 'claude-all 7' first.${NC}"
+        exit 1
+    fi
+else
+    # Anthropic Mode
+    if [[ -z "$ANTHROPIC_API_KEY" ]]; then
+        echo "Enter Anthropic API Key:"
+        if [[ "$PLATFORM" == "Windows" ]]; then
+            read ANTHROPIC_API_KEY
+        else
+            read -s ANTHROPIC_API_KEY
+        fi
+        export ANTHROPIC_API_KEY
+    fi
+    export ANTHROPIC_BASE_URL="https://api.anthropic.com"
+    echo -e "${GREEN}✓ Using Anthropic endpoint: $MODEL_NAME${NC}"
+fi
+
+echo ""
+echo "Starting chat..."
+echo ""
+
+# Launch claude
+exec claude --model "$MODEL_NAME"

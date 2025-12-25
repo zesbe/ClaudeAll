@@ -1,0 +1,7 @@
+{
+    "provider_name": "Cohere",
+    "description": "Enterprise AI models",
+    "api_key": "xxxxxxxx",
+    "api_base": "https://api.cohere.ai/",
+    "model": "command-r-plus"
+}

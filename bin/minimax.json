@@ -1,0 +1,26 @@
+{
+  "name": "MiniMax",
+  "description": "MiniMax Models (minimax.ai) - WORKING MODELS ONLY",
+  "models": [
+    {
+      "id": "MiniMax-M2",
+      "name": "MiniMax M2",
+      "description": "MiniMax M2 model (Default) ✅"
+    },
+    {
+      "id": "abab6.5-chat",
+      "name": "abab6.5-chat",
+      "description": "MiniMax abab6.5 chat model ✅"
+    },
+    {
+      "id": "abab6.5s-chat",
+      "name": "abab6.5s-chat",
+      "description": "MiniMax abab6.5s chat model ✅"
+    },
+    {
+      "id": "minimax-m2",
+      "name": "minimax-m2",
+      "description": "Alternative MiniMax M2 model name ✅"
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "name": "claude-all-ai-launcher",
+  "version": "8.1.2",
+  "description": "🤖 Universal AI CLI Launcher - Claude Code with ANY AI Provider + Enhanced Terminal Tools (MiniMax, Gemini, OpenAI, Groq, Ollama, Custom APIs)",
+  "main": "index.js",
+  "bin": {
+    "claude-all": "./claude-all",
+    "ai-chat": "./bin/ai-chat",
+    "claude-launcher": "./bin/claude-launcher",
+    "switch-provider": "./bin/switch-provider"
+  },
+  "scripts": {
+    "install": "node utils/install.js",
+    "postinstall": "node utils/postinstall.js",
+    "claude": "node claude-all",
+    "launch": "node bin/claude-all",
+    "switch": "node bin/switch-provider",
+    "config": "node utils/config.js",
+    "status": "node utils/status.js",
+    "update": "node utils/update.js",
+    "uninstall": "node utils/uninstall.js",
+    "help": "node utils/help.js",
+    "test": "node utils/test.js",
+    "doctor": "node utils/doctor.js"
+  },
+  "keywords": [
+    "claude",
+    "ai",
+    "cli",
+    "launcher",
+    "anthropic",
+    "openai",
+    "minimax",
+    "gemini",
+    "groq",
+    "ollama",
+    "llm",
+    "chatbot",
+    "terminal",
+    "command-line",
+    "artificial-intelligence",
+    "multimodel",
+    "api",
+    "universal"
+  ],
+  "author": {
+    "name": "zesbe",
+    "email": "yudiharyanto41@gmail.com",
+    "url": "https://github.com/zesbe"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zesbe/ClaudeAll.git"
+  },
+  "homepage": "https://github.com/zesbe/ClaudeAll#readme",
+  "bugs": {
+    "url": "https://github.com/zesbe/ClaudeAll/issues"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "os": [
+    "linux",
+    "darwin",
+    "win32",
+    "freebsd",
+    "openbsd",
+    "android",
+    "sunos"
+  ],
+  "files": [
+    "bin/",
+    "utils/",
+    "model/",
+    "claude-suite/",
+    "superpowers/",
+    "scripts/",
+    "docs/",
+    "claude-all",
+    "README.md",
+    "LICENSE",
+    "VERSION"
+  ],
+  "preferGlobal": true,
+  "dependencies": {},
+  "devDependencies": {},
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/zesbe"
+  },
+  "man": [
+    "./docs/claude-all.1"
+  ]
+}

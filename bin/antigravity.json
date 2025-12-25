@@ -1,0 +1,76 @@
+{
+  "name": "AntiGravity",
+  "description": "Google Internal AI Models via AntiGravity",
+  "models": [
+    {
+      "id": "claude-3-5-sonnet-20241022",
+      "name": "Claude 3.5 Sonnet (Latest)",
+      "description": "Anthropic's most capable model for complex tasks"
+    },
+    {
+      "id": "claude-3-opus-20240229",
+      "name": "Claude 3 Opus",
+      "description": "Most powerful Claude model for expert-level tasks"
+    },
+    {
+      "id": "claude-3-sonnet-20240229",
+      "name": "Claude 3 Sonnet",
+      "description": "Balanced performance for everyday tasks"
+    },
+    {
+      "id": "claude-3-haiku-20240307",
+      "name": "Claude 3 Haiku",
+      "description": "Fastest Claude model for quick responses"
+    },
+    {
+      "id": "gpt-4-turbo",
+      "name": "GPT-4 Turbo",
+      "description": "OpenAI's advanced reasoning model"
+    },
+    {
+      "id": "gpt-4",
+      "name": "GPT-4",
+      "description": "OpenAI's most capable model"
+    },
+    {
+      "id": "gpt-3.5-turbo",
+      "name": "GPT-3.5 Turbo",
+      "description": "OpenAI's fast and efficient model"
+    },
+    {
+      "id": "gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash",
+      "description": "Latest generation model, ultra-fast response"
+    },
+    {
+      "id": "gemini-2.5-pro",
+      "name": "Gemini 2.5 Pro",
+      "description": "Enhanced capabilities model"
+    },
+    {
+      "id": "gemini-3-pro-preview",
+      "name": "Gemini 3 Pro Preview",
+      "description": "Preview of next-gen Gemini 3"
+    },
+    {
+      "id": "gemini-2.0-flash-exp",
+      "name": "Gemini 2.0 Flash Experimental",
+      "description": "Experimental features model"
+    },
+    {
+      "id": "gemini-2.0-flash",
+      "name": "Gemini 2.0 Flash",
+      "description": "Stable high-performance model"
+    },
+    {
+      "id": "gemini-1.5-pro",
+      "name": "Gemini 1.5 Pro",
+      "description": "Reliable workhorse model"
+    },
+    {
+      "id": "gemini-1.5-flash",
+      "name": "Gemini 1.5 Flash",
+      "description": "Fast and efficient model"
+    }
+  ]
+}

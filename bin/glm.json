@@ -1,0 +1,21 @@
+{
+  "name": "ZhipuAI GLM",
+  "description": "ZhipuAI GLM Models (Z.AI) - WORKING MODELS ONLY",
+  "models": [
+    {
+      "id": "claude-3-5-sonnet-20241022",
+      "name": "GLM-4",
+      "description": "Latest flagship model (Opus/Sonnet class) ✅"
+    },
+    {
+      "id": "claude-3-5-haiku-20241022",
+      "name": "GLM-4 Flash",
+      "description": "Fast variant (Haiku class) ✅"
+    },
+    {
+      "id": "claude-3-opus-20240229",
+      "name": "GLM-4 Air",
+      "description": "Lightweight model ✅"
+    }
+  ]
+}

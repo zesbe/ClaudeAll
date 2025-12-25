@@ -1,0 +1,82 @@
+Claude Code Multi-Model Launcher - Help
+=======================================
+
+Usage:
+  claude-all <provider> [options] [message]
+  claude-all --help
+
+Provider Options (1-10):
+  1) MiniMax (Direct Anthropic API)
+  2) Google Gemini (API Key - AI Studio)
+  3) Google Gemini (OAuth - Vertex AI)
+  4) OpenAI (API Key)
+  5) OpenAI (OAuth - Experimental)
+  6) xAI / Grok (API Key)
+  7) ZhipuAI / GLM (API Key)
+  8) Groq (API Key)
+  9) Ollama (Local Models)
+  10) Custom / Other
+
+Options:
+  -m, --model <model_name>  Specify exact model to use
+  -h, --help               Show this help message
+
+Examples:
+  # Use default model (auto-selects first model)
+  claude-all 7
+  echo "Hello" | claude-all 7
+
+  # Use specific model
+  claude-all 7 --model glm-4.5-air
+  claude-all 4 -m o1-preview
+  claude-all 8 -m llama-3.3-70b-versatile
+
+  # Direct message (no need for /model prefix)
+  echo "Write a function" | claude-all 7 --model glm-4.6
+
+Available Models by Provider:
+-----------------------------
+
+GLM (7):
+  - glm-4.6 (default)
+  - glm-4.6-flash
+  - glm-4.6-plus
+  - glm-4.5-air
+  - glm-4.5-pro
+  - glm-4-plus
+  - glm-4-air
+  - glm-4-airx
+  - glm-4
+
+OpenAI (8):
+  - o1-preview
+  - o1-mini
+  - gpt-4o (default)
+  - gpt-4o-mini
+  - gpt-4-turbo
+  - gpt-4o-2024-08-06
+  - gpt-4
+  - gpt-3.5-turbo
+
+Groq (7):
+  - llama-3.3-70b-versatile (default)
+  - llama-3.1-70b-versatile
+  - llama-3.1-8b-instant
+  - llama3-70b-8192
+  - llama3-8b-8192
+  - mixtral-8x7b-32768
+  - gemma2-9b-it
+
+Gemini (7):
+  - gemini-2.0-flash-exp
+  - gemini-1.5-pro
+  - gemini-1.5-pro-latest
+  - gemini-1.5-flash
+  - gemini-1.5-flash-8b
+  - gemini-1.5-flash-latest
+  - gemini-1.0-pro
+
+Tips:
+- Use --model to avoid auto-selection
+- You can also set API key via environment variable
+- No need to type /model prefix when piping messages

@@ -1,0 +1,7 @@
+{
+  "provider_name": "Qwen",
+  "description": "Custom AI Provider",
+  "api_base": "https://api.example.com/",
+  "model": "default-model",
+  "api_key": "your-api-key-here"
+}
