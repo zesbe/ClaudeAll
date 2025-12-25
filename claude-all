@@ -1049,7 +1049,7 @@ if [[ -z "$choice" ]]; then
     echo " 14) Moonshot (API Key)                   🌙 Kawaii AI"
     echo " 15) Qwen (API Key)                       🇨🇳 Alibaba"
     echo " 16) OpenRouter (Multi-provider)           🔀 All-in-one"
-    echo " 17) Letta Memory Agent                  🧠 Claude + Memory Prompts"
+    echo " 17) Letta Memory Agent                  🧠 Multi-Backend (Claude/Gemini/OpenAI)"
     echo ""
     echo -e "${YELLOW}🔧 TOOLS & UTILITIES:${NC}"
     echo " 18) 🔑 API Key Manager                   🔐 View/Edit/Delete Keys"
@@ -2106,51 +2106,171 @@ EOF
         echo -e "${BLUE}Configuring Letta Memory Agent...${NC}"
         echo ""
         echo -e "${CYAN}🧠 Letta: Memory-Augmented AI Agent Framework${NC}"
-        echo -e "${YELLOW}Note: This uses Claude models with Letta-style memory prompts${NC}"
-        echo -e "${YELLOW}      Real Letta API integration coming soon${NC}"
+        echo -e "${YELLOW}Memory-augmented AI with multiple backend options${NC}"
         echo ""
 
-        # Choose Claude backend
-        echo "Choose Claude backend model:"
-        echo "  1) Opus   🔬 Most powerful - Best for complex reasoning"
-        echo "  2) Sonnet 🧠 Balanced - Good for most tasks"
-        echo "  3) Haiku  ⚡ Fastest - Quick responses"
+        # Choose backend provider
+        echo "Choose AI Backend Provider:"
+        echo "  1) Claude   🔷 Anthropic (Opus/Sonnet/Haiku)"
+        echo "  2) Gemini   🌟 Google AI Studio"
+        echo "  3) OpenAI   🤖 ChatGPT (GPT-4o/GPT-4)"
         echo ""
 
-        read -p "Select [1-3, default: 1]: " letta_choice
-        [[ -z "$letta_choice" ]] && letta_choice=1
+        read -p "Select backend [1-3, default: 1]: " backend_choice
+        [[ -z "$backend_choice" ]] && backend_choice=1
 
-        case $letta_choice in
+        case $backend_choice in
             1)
-                MODEL_NAME="opus"
-                model_desc="Letta on Claude Opus"
-                system_prompt="You are Letta, a memory-augmented AI agent with persistent memory capabilities. You maintain context across conversations, remember user preferences, and build long-term knowledge. You're running on Claude Opus for maximum reasoning capability. Key features: (1) Long-term memory - you remember past conversations, (2) Context awareness - you track conversation threads, (3) Personalization - you adapt to user preferences. Always identify yourself as Letta when asked."
+                # Claude Backend
+                echo ""
+                echo -e "${CYAN}Claude Models:${NC}"
+                echo "  1) Opus   🔬 Most powerful - Best for complex reasoning"
+                echo "  2) Sonnet 🧠 Balanced - Good for most tasks"
+                echo "  3) Haiku  ⚡ Fastest - Quick responses"
+                echo ""
+
+                read -p "Select model [1-3, default: 1]: " model_choice
+                [[ -z "$model_choice" ]] && model_choice=1
+
+                case $model_choice in
+                    1)
+                        MODEL_NAME="opus"
+                        model_desc="Letta on Claude Opus"
+                        ;;
+                    2)
+                        MODEL_NAME="sonnet"
+                        model_desc="Letta on Claude Sonnet"
+                        ;;
+                    3)
+                        MODEL_NAME="haiku"
+                        model_desc="Letta on Claude Haiku"
+                        ;;
+                    *)
+                        MODEL_NAME="opus"
+                        model_desc="Letta on Claude Opus"
+                        ;;
+                esac
+
+                system_prompt="You are Letta, a memory-augmented AI agent with persistent memory capabilities. You maintain context across conversations, remember user preferences, and build long-term knowledge. You're running on Claude $MODEL_NAME. Key features: (1) Long-term memory - you remember past conversations, (2) Context awareness - you track conversation threads, (3) Personalization - you adapt to user preferences. Always identify yourself as Letta when asked."
+
+                echo -e "${GREEN}✓ Backend: Claude $MODEL_NAME${NC}"
+                echo -e "${BLUE}🚀 Starting Letta on Claude...${NC}"
+                exec claude --model "$MODEL_NAME" --system-prompt "$system_prompt"
                 ;;
+
             2)
-                MODEL_NAME="sonnet"
-                model_desc="Letta on Claude Sonnet"
-                system_prompt="You are Letta, a memory-augmented AI agent with persistent memory capabilities. You maintain context across conversations and provide balanced, efficient responses. Running on Claude Sonnet for optimal performance. You remember past interactions and adapt to user needs. Always identify yourself as Letta when asked."
+                # Gemini Backend
+                echo ""
+                echo -e "${CYAN}Configuring Gemini backend...${NC}"
+
+                # Get API key
+                if [[ -z "$GEMINI_API_KEY" ]]; then
+                    load_api_key "$HOME/.gemini_api_key" "GEMINI_API_KEY"
+                fi
+
+                if [[ -z "$GEMINI_API_KEY" ]]; then
+                    echo "Get Key: https://aistudio.google.com/app/apikey"
+                    read -s -p "Enter Gemini API Key: " GEMINI_API_KEY
+                    echo ""
+                    save_api_key "$GEMINI_API_KEY" "$HOME/.gemini_api_key" "Gemini"
+                fi
+                export GEMINI_API_KEY
+
+                echo ""
+                echo -e "${CYAN}Gemini Models:${NC}"
+                echo "  1) gemini-2.0-flash-exp    ⚡ Latest experimental (Recommended)"
+                echo "  2) gemini-3-pro-preview    🚀 Next Gen Preview"
+                echo ""
+
+                read -p "Select model [1-2, default: 1]: " model_choice
+                [[ -z "$model_choice" ]] && model_choice=1
+
+                case $model_choice in
+                    1)
+                        MODEL_NAME="gemini-2.0-flash-exp"
+                        model_desc="Letta on Gemini 2.0 Flash"
+                        ;;
+                    2)
+                        MODEL_NAME="gemini-3-pro-preview"
+                        model_desc="Letta on Gemini 3 Pro"
+                        ;;
+                    *)
+                        MODEL_NAME="gemini-2.0-flash-exp"
+                        model_desc="Letta on Gemini 2.0 Flash"
+                        ;;
+                esac
+
+                system_prompt="You are Letta, a memory-augmented AI agent with persistent memory capabilities. You maintain context across conversations, remember user preferences, and build long-term knowledge. You're running on $MODEL_NAME. Key features: (1) Long-term memory - you remember past conversations, (2) Context awareness - you track conversation threads, (3) Personalization - you adapt to user preferences. Always identify yourself as Letta when asked."
+
+                echo -e "${GREEN}✓ Backend: Gemini ($MODEL_NAME)${NC}"
+                echo -e "${BLUE}🚀 Starting Letta on Gemini...${NC}"
+                exec claude --model "$MODEL_NAME" --system-prompt "$system_prompt"
                 ;;
+
             3)
-                MODEL_NAME="haiku"
-                model_desc="Letta on Claude Haiku"
-                system_prompt="You are Letta, a memory-augmented AI agent optimized for quick responses while maintaining memory capabilities. Running on Claude Haiku for speed. You maintain conversation context and provide concise, efficient answers. Always identify yourself as Letta when asked."
+                # OpenAI Backend
+                echo ""
+                echo -e "${CYAN}Configuring OpenAI backend...${NC}"
+
+                # Get API key
+                if [[ -z "$OPENAI_API_KEY" ]]; then
+                    load_api_key "$HOME/.openai_api_key" "OPENAI_API_KEY"
+                fi
+
+                if [[ -z "$OPENAI_API_KEY" ]]; then
+                    echo "Get Key: https://platform.openai.com/api-keys"
+                    read -s -p "Enter OpenAI API Key: " OPENAI_API_KEY
+                    echo ""
+                    save_api_key "$OPENAI_API_KEY" "$HOME/.openai_api_key" "OpenAI"
+                fi
+
+                # Set OpenAI environment
+                export ANTHROPIC_API_KEY="$OPENAI_API_KEY"
+                export ANTHROPIC_BASE_URL="https://api.openai.com/v1"
+
+                echo ""
+                echo -e "${CYAN}OpenAI Models:${NC}"
+                echo "  1) gpt-4o         🚀 Latest flagship (Recommended)"
+                echo "  2) gpt-4o-mini    ⚡ Fast and efficient"
+                echo "  3) gpt-4-turbo    🧠 Legacy powerful model"
+                echo ""
+
+                read -p "Select model [1-3, default: 1]: " model_choice
+                [[ -z "$model_choice" ]] && model_choice=1
+
+                case $model_choice in
+                    1)
+                        MODEL_NAME="gpt-4o"
+                        model_desc="Letta on GPT-4o"
+                        ;;
+                    2)
+                        MODEL_NAME="gpt-4o-mini"
+                        model_desc="Letta on GPT-4o Mini"
+                        ;;
+                    3)
+                        MODEL_NAME="gpt-4-turbo"
+                        model_desc="Letta on GPT-4 Turbo"
+                        ;;
+                    *)
+                        MODEL_NAME="gpt-4o"
+                        model_desc="Letta on GPT-4o"
+                        ;;
+                esac
+
+                system_prompt="You are Letta, a memory-augmented AI agent with persistent memory capabilities. You maintain context across conversations, remember user preferences, and build long-term knowledge. You're running on $MODEL_NAME. Key features: (1) Long-term memory - you remember past conversations, (2) Context awareness - you track conversation threads, (3) Personalization - you adapt to user preferences. Always identify yourself as Letta when asked."
+
+                echo -e "${GREEN}✓ Backend: OpenAI ($MODEL_NAME)${NC}"
+                echo -e "${BLUE}🚀 Starting Letta on OpenAI...${NC}"
+                exec claude --model "$MODEL_NAME" --system-prompt "$system_prompt"
                 ;;
+
             *)
+                echo -e "${RED}Invalid choice. Using Claude Opus as default.${NC}"
                 MODEL_NAME="opus"
-                model_desc="Letta on Claude Opus (default)"
-                system_prompt="You are Letta, a memory-augmented AI agent with persistent memory capabilities. Running on Claude Opus for maximum capability."
+                system_prompt="You are Letta, a memory-augmented AI agent with persistent memory capabilities. Running on Claude Opus."
+                exec claude --model "$MODEL_NAME" --system-prompt "$system_prompt"
                 ;;
         esac
-
-        echo -e "${GREEN}✓ Selected: $MODEL_NAME${NC}"
-        echo -e "${CYAN}Description: $model_desc${NC}"
-        echo ""
-        echo -e "${BLUE}🚀 Starting Letta Memory Agent...${NC}"
-        echo -e "${GREEN}✓ Backend: Claude $MODEL_NAME${NC}"
-        echo -e "${GREEN}✓ Memory: Letta-style prompting${NC}"
-        echo ""
-        exec claude --model "$MODEL_NAME" --system-prompt "$system_prompt"
         ;;
     18)
         # API Key Manager - Built-in function
