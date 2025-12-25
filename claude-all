@@ -1650,7 +1650,7 @@ case $choice in
 
         # Check if custom Perplexity model exists
         if [[ -f "$SCRIPT_DIR/model/perplexity.json" ]]; then
-            handle_custom_model "perplexity.json" "$@"
+            handle_custom_model "perplexity" "$@"
         else
             # Create temporary Perplexity config
             echo -e "${YELLOW}Creating temporary Perplexity configuration...${NC}"
@@ -1666,7 +1666,7 @@ case $choice in
 }
 EOF
 
-            handle_custom_model "temp_perplexity.json" "$@"
+            handle_custom_model "temp_perplexity" "$@"
             rm -f "$SCRIPT_DIR/model/temp_perplexity.json"
         fi
         ;;
