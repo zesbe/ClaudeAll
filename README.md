@@ -42,7 +42,7 @@ npm install -g claude-all-ai-launcher && npm run config && claude-all
 ## 🌟 Key Features
 
 ### 🤖 Universal AI Support (23 Providers)
-- **MiniMax** - High-performance Chinese AI
+- **MiniMax** - High-performance AI (NEW: M2.1 coding model! 🆕)
 - **Google Gemini** - Advanced multimodal AI
 - **OpenAI** - GPT-4 and GPT-3.5 Turbo
 - **xAI/Grok** - Real-time AI by xAI
@@ -66,6 +66,24 @@ npm install -g claude-all-ai-launcher && npm run config && claude-all
 | # | Provider | API Endpoint | Get API Key | Environment Variable |
 |---|----------|--------------|-------------|---------------------|
 | 1 | **MiniMax** | `https://api.minimax.io/anthropic` | [Get Key](https://platform.minimax.io/) | `MINIMAX_API_KEY` |
+
+#### MiniMax Available Models
+
+| Model | Description | Use Case | Parameters |
+|-------|-------------|----------|------------|
+| **minimax-m2.1** 🆕 | Latest coding model (Dec 2025) | Multi-language programming, agentic workflows | 10B activated |
+| claude-3-5-sonnet-20241022 | Claude-compatible endpoint | General chat, compatible with Claude API | - |
+| abab6.5 | General purpose model | Multi-modal tasks | - |
+| abab6.5s | Fast variant | Quick responses | - |
+| abab5.5 | Lighter model | Resource-efficient tasks | - |
+
+**MiniMax M2.1 Highlights:**
+- 🚀 **Released**: December 23, 2025
+- 💡 **Optimized for**: Rust, Java, Go, C++, Kotlin, Objective-C, TypeScript, JavaScript
+- 📊 **Benchmarks**: 49.4% Multi-SWE-Bench, 72.5% SWE-Bench Multilingual, 88.6 VIBE avg
+- ⚡ **Performance**: 10B activated parameters, exceptional latency & cost efficiency
+- 🎯 **Best for**: AI coding tools, Claude Code, Cline, agents, real-world complex tasks
+- 💰 **Pricing**: ~$0.30/M input tokens, ~$1.20/M output tokens
 | 2 | **Gemini (API Key)** | `https://generativelanguage.googleapis.com/v1beta/anthropic` | [Get Key](https://aistudio.google.com/app/apikey) | `GEMINI_API_KEY` |
 | 3 | **AntiGravity (OAuth)** | `https://antigravity.corp.google.com/v1` | Internal Google Only | `GOOGLE_AUTH_TOKEN` |
 | 4 | **OpenAI** | `https://api.openai.com/v1` | [Get Key](https://platform.openai.com/api-keys) | `OPENAI_API_KEY` |
@@ -849,9 +867,20 @@ git commit -m "🔧 Fix version mismatch"
 
 ## 🎯 Quick Start Examples
 
-### Chat with MiniMax
+### Chat with MiniMax M2.1 (Latest Coding Model)
+```bash
+# Using MiniMax M2.1 for coding tasks
+claude-all --provider minimax
+# When prompted, enter: m2 (or just press Enter for default)
+
+# Example coding task
+"Write a Rust function to parse JSON with error handling"
+```
+
+### Chat with MiniMax (Legacy)
 ```bash
 claude-all --provider minimax "Hello, explain quantum computing"
+# Enter model: sonnet (for Claude-compatible endpoint)
 ```
 
 ### Code Analysis with OpenAI

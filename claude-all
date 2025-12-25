@@ -1210,16 +1210,64 @@ case $choice in
         export ANTHROPIC_BASE_URL="https://api.minimax.io/anthropic"
         export ANTHROPIC_API_KEY="$MINIMAX_API_KEY"
         echo -e "${GREEN}✓ MiniMax API configured${NC}"
-        echo -e "${YELLOW}Note: MiniMax maps model names automatically.${NC}"
 
-        # Use default MiniMax model
-        MODEL_NAME="claude-3-5-sonnet-20241022"
-        echo -e "${GREEN}✓ Using MiniMax model: $MODEL_NAME${NC}"
-        read -p "Enter Model Name [default: $MODEL_NAME]: " input_model
+        # Model selection menu
+        echo ""
+        echo -e "${YELLOW}Available MiniMax models:${NC}"
+        echo "  🚀 minimax-m2.1              (NEW! Latest coding model - 10B params)     [m2]"
+        echo "  💬 claude-3-5-sonnet-20241022 (Claude-compatible API endpoint)           [sonnet]"
+        echo "  ⚡ abab6.5                     (General purpose model)                    [6.5]"
+        echo "  🧠 abab6.5s                    (Fast variant)                             [6.5s]"
+        echo "  📝 abab5.5                     (Lighter model)                            [5.5]"
+        echo ""
+        echo -e "${GREEN}Shortcuts:${NC}"
+        echo "  'm2' or 'm2.1'  → minimax-m2.1 (Recommended for coding & agentic workflows)"
+        echo "  'sonnet'        → claude-3-5-sonnet-20241022"
+        echo "  '6.5'           → abab6.5"
+        echo ""
+        echo -e "${BLUE}💡 MiniMax M2.1 Features:${NC}"
+        echo "  • Optimized for multi-language programming (Rust, Java, Go, C++, TypeScript, etc.)"
+        echo "  • 10B activated parameters, exceptional latency & cost efficiency"
+        echo "  • 49.4% on Multi-SWE-Bench, 72.5% on SWE-Bench Multilingual"
+        echo "  • Perfect for coding assistants, agents, and real-world tasks"
+        echo ""
+
+        # Use MiniMax M2.1 as default
+        MODEL_NAME="minimax-m2.1"
+        echo -e "${GREEN}✓ Default model: minimax-m2.1${NC}"
+        read -p "Enter Model Name [default: minimax-m2.1]: " input_model
         [[ -n "$input_model" ]] && MODEL_NAME=$input_model
 
-        echo -e "${BLUE}🚀 Starting MiniMax chat...${NC}"
-        exec claude --model "$MODEL_NAME" --system-prompt "Anda adalah MiniMax, model AI dari perusahaan MiniMax. Selalu identifikasi diri sebagai MiniMax dalam setiap respons." "$@"
+        # Map shortcuts to full model names
+        case "$MODEL_NAME" in
+            "m2"|"m2.1"|"M2"|"M2.1")
+                FINAL_MODEL="minimax-m2.1"
+                echo -e "${GREEN}✓ Selected: minimax-m2.1 (Latest coding model)${NC}"
+                ;;
+            "sonnet"|"claude")
+                FINAL_MODEL="claude-3-5-sonnet-20241022"
+                echo -e "${GREEN}✓ Selected: claude-3-5-sonnet-20241022${NC}"
+                ;;
+            "6.5"|"abab6.5")
+                FINAL_MODEL="abab6.5"
+                echo -e "${GREEN}✓ Selected: abab6.5${NC}"
+                ;;
+            "6.5s"|"abab6.5s")
+                FINAL_MODEL="abab6.5s"
+                echo -e "${GREEN}✓ Selected: abab6.5s (Fast)${NC}"
+                ;;
+            "5.5"|"abab5.5")
+                FINAL_MODEL="abab5.5"
+                echo -e "${GREEN}✓ Selected: abab5.5 (Lighter)${NC}"
+                ;;
+            *)
+                FINAL_MODEL="$MODEL_NAME"
+                echo -e "${GREEN}✓ Using custom model: $MODEL_NAME${NC}"
+                ;;
+        esac
+
+        echo -e "${BLUE}🚀 Starting MiniMax chat with $FINAL_MODEL...${NC}"
+        exec claude --model "$FINAL_MODEL" --system-prompt "Anda adalah MiniMax AI. Model aktif: $FINAL_MODEL. Selalu identifikasi diri sebagai MiniMax dalam setiap respons." "$@"
         ;;
     2)
         # Gemini API Key - Direct Integration
