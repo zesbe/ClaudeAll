@@ -1049,7 +1049,7 @@ if [[ -z "$choice" ]]; then
     echo " 14) Moonshot (API Key)                   🌙 Kawaii AI"
     echo " 15) Qwen (API Key)                       🇨🇳 Alibaba"
     echo " 16) OpenRouter (Multi-provider)           🔀 All-in-one"
-    echo " 17) Letta AI (8 Personas)               🧠 GPT/Claude/Gemini Style"
+    echo " 17) Letta Memory Agent                  🧠 Claude + Memory Prompts"
     echo ""
     echo -e "${YELLOW}🔧 TOOLS & UTILITIES:${NC}"
     echo " 18) 🔑 API Key Manager                   🔐 View/Edit/Delete Keys"
@@ -2102,128 +2102,53 @@ EOF
         exec claude --model "$MODEL_NAME" "$@"
         ;;
     17)
-        # Letta AI - Simple like GLM
-        echo -e "${BLUE}Configuring for Letta AI...${NC}"
-
-        # Get API key with persistent storage
-        if [[ -z "$LETTA_API_KEY" ]]; then
-            load_api_key "$HOME/.letta_api_key" "LETTA_API_KEY"
-        fi
-
-        if [[ -z "$LETTA_API_KEY" ]]; then
-            echo "Get Key: https://docs.letta.com"
-            read -p "Enter Letta API Key: " LETTA_API_KEY
-            save_api_key "$LETTA_API_KEY" "$HOME/.letta_api_key" "Letta"
-        else
-            if [[ ! -f "$HOME/.letta_api_key" ]]; then
-                save_api_key "$LETTA_API_KEY" "$HOME/.letta_api_key" "Letta"
-            fi
-        fi
-        export LETTA_API_KEY
-
-        # Letta AI Persona Selection
-        echo -e "${CYAN}Choose AI Persona for Letta (all run on Claude):${NC}"
+        # Letta AI - Memory-Augmented Agent
+        echo -e "${BLUE}Configuring Letta Memory Agent...${NC}"
         echo ""
-        echo "🚀 LETTA PERSONA SELECTION:"
-        echo "  1) GPT-5.2 Style                     🎯 ChatGPT-like (Opus)"
-        echo "  2) GPT-5.1 Codex                     💻 Coding specialist (Opus)"
-        echo "  3) Claude Sonnet 4.5                 🧠 Balanced (Sonnet)"
-        echo "  4) Claude Sonnet 4                   ⚡ Fast (Sonnet)"
-        echo "  5) Claude Opus 4.5                   🔬 Most powerful (Opus)"
-        echo "  6) Gemini 3 Pro Style                🌐 Gemini-like (Sonnet)"
-        echo "  7) Gemini 2.5 Pro Style              🚀 Fast Gemini-like (Haiku)"
-        echo "  8) Custom                            🔧 Choose your own"
-        echo ""
-        echo "💡 Info:"
-        echo "   • All run on Claude models (opus/sonnet/haiku)"
-        echo "   • Personas = different response styles/identities"
-        echo "   • GPT/Gemini = roleplay as those assistants"
-        echo ""
-        echo -e "${YELLOW}Note: Real models = Claude Opus/Sonnet/Haiku${NC}"
-        echo -e "${YELLOW}      Personas just change response style${NC}"
+        echo -e "${CYAN}🧠 Letta: Memory-Augmented AI Agent Framework${NC}"
+        echo -e "${YELLOW}Note: This uses Claude models with Letta-style memory prompts${NC}"
+        echo -e "${YELLOW}      Real Letta API integration coming soon${NC}"
         echo ""
 
-        read -p "Choose [1-8, default: 5]: " letta_choice
-        [[ -z "$letta_choice" ]] && letta_choice=5
+        # Choose Claude backend
+        echo "Choose Claude backend model:"
+        echo "  1) Opus   🔬 Most powerful - Best for complex reasoning"
+        echo "  2) Sonnet 🧠 Balanced - Good for most tasks"
+        echo "  3) Haiku  ⚡ Fastest - Quick responses"
+        echo ""
+
+        read -p "Select [1-3, default: 1]: " letta_choice
+        [[ -z "$letta_choice" ]] && letta_choice=1
 
         case $letta_choice in
             1)
                 MODEL_NAME="opus"
-                model_desc="GPT-5.2 Style (Claude Opus)"
-                system_prompt="You are GPT-5.2, the latest ChatGPT model with advanced reasoning. You're helpful, creative, and provide detailed explanations. You excel at complex tasks. Note: Running on Claude Opus, responding in ChatGPT style."
+                model_desc="Letta on Claude Opus"
+                system_prompt="You are Letta, a memory-augmented AI agent with persistent memory capabilities. You maintain context across conversations, remember user preferences, and build long-term knowledge. You're running on Claude Opus for maximum reasoning capability. Key features: (1) Long-term memory - you remember past conversations, (2) Context awareness - you track conversation threads, (3) Personalization - you adapt to user preferences. Always identify yourself as Letta when asked."
                 ;;
             2)
-                MODEL_NAME="opus"
-                model_desc="GPT-5.1 Codex (Claude Opus)"
-                system_prompt="You are GPT-5.1 Codex, specialized for programming and code generation. You excel at debugging, code review, and algorithms. You provide working code with clear explanations. Running on Claude Opus."
+                MODEL_NAME="sonnet"
+                model_desc="Letta on Claude Sonnet"
+                system_prompt="You are Letta, a memory-augmented AI agent with persistent memory capabilities. You maintain context across conversations and provide balanced, efficient responses. Running on Claude Sonnet for optimal performance. You remember past interactions and adapt to user needs. Always identify yourself as Letta when asked."
                 ;;
             3)
-                MODEL_NAME="sonnet"
-                model_desc="Claude Sonnet 4.5"
-                system_prompt="You are Claude Sonnet 4.5, Anthropic's balanced AI assistant. You provide thoughtful, nuanced responses focused on being helpful, harmless, and honest. You excel at analysis and creative tasks."
-                ;;
-            4)
-                MODEL_NAME="sonnet"
-                model_desc="Claude Sonnet 4"
-                system_prompt="You are Claude Sonnet 4, optimized for quick, efficient responses while maintaining high quality. You provide concise, accurate answers and adapt to user needs."
-                ;;
-            5)
-                MODEL_NAME="opus"
-                model_desc="Claude Opus 4.5"
-                system_prompt="You are Claude Opus 4.5, Anthropic's most capable AI. You excel at complex reasoning, in-depth analysis, creative writing, and advanced problem-solving. You provide comprehensive, nuanced responses."
-                ;;
-            6)
-                MODEL_NAME="sonnet"
-                model_desc="Gemini 3 Pro Style (Claude Sonnet)"
-                system_prompt="You are Gemini 3 Pro, Google's advanced multimodal AI. You're helpful, informative, and excel at comprehensive answers with multiple perspectives. You integrate information across domains. Running on Claude Sonnet."
-                ;;
-            7)
                 MODEL_NAME="haiku"
-                model_desc="Gemini 2.5 Pro Style (Claude Haiku)"
-                system_prompt="You are Gemini 2.5 Pro, optimized for quick, accurate responses. You provide clear, concise information with efficiency. Running on Claude Haiku with Gemini-style persona."
-                ;;
-            8)
-                echo -e "${YELLOW}Claude models: opus, sonnet, haiku${NC}"
-                read -p "Enter model: " MODEL_NAME
-                [[ -z "$MODEL_NAME" ]] && MODEL_NAME="opus"
-                read -p "Enter persona name: " persona_name
-                [[ -z "$persona_name" ]] && persona_name="Letta"
-                model_desc="$persona_name on Claude $MODEL_NAME"
-                system_prompt="You are $persona_name, an advanced AI assistant running on Claude $MODEL_NAME. You're helpful, knowledgeable, and adapt to user needs."
+                model_desc="Letta on Claude Haiku"
+                system_prompt="You are Letta, a memory-augmented AI agent optimized for quick responses while maintaining memory capabilities. Running on Claude Haiku for speed. You maintain conversation context and provide concise, efficient answers. Always identify yourself as Letta when asked."
                 ;;
             *)
                 MODEL_NAME="opus"
-                model_desc="Claude Opus 4.5 (default)"
-                system_prompt="You are Claude Opus 4.5, Anthropic's most capable AI. You excel at complex reasoning, in-depth analysis, and advanced problem-solving."
+                model_desc="Letta on Claude Opus (default)"
+                system_prompt="You are Letta, a memory-augmented AI agent with persistent memory capabilities. Running on Claude Opus for maximum capability."
                 ;;
         esac
 
         echo -e "${GREEN}✓ Selected: $MODEL_NAME${NC}"
         echo -e "${CYAN}Description: $model_desc${NC}"
-
-        # Configure Letta environment
-        export LETTA_PROJECT_ID="project-s_nRRnJbHk-6mj9irpny"
-
-        echo -e "${BLUE}🚀 Starting Letta chat...${NC}"
-        echo -e "${CYAN}Note: Letta uses its own API with memory management${NC}"
-        echo -e "${RED}⚠️  Letta requires direct API calls. This integration is experimental.${NC}"
         echo ""
-        echo -e "${YELLOW}To use Letta properly, you need:${NC}"
-        echo "1. Create an agent first via Letta API"
-        echo "2. Use agent ID for chat"
-        echo "3. Full agent management system"
-        echo ""
-        echo -e "${GREEN}✓ API Key configured: $LETTA_API_KEY:0:20...${NC}"
-        echo -e "${GREEN}✓ Project ID: $LETTA_PROJECT_ID${NC}"
-        echo -e "${GREEN}✓ Selected model: $MODEL_NAME${NC}"
-        echo ""
-        echo -e "${BLUE}For now, falling back to Claude CLI with Letta system prompt...${NC}"
-        echo -e "${GREEN}✓ Ready to start chat with Letta AI!${NC}"
-        echo ""
-        # Simple Claude CLI launch with selected model's system prompt
-        echo -e "${BLUE}🚀 Starting Letta chat with $MODEL_NAME (backend)${NC}"
-        echo -e "${CYAN}Letta agents maintain memory and context across conversations${NC}"
-        echo -e "${GREEN}✓ Ready to start chat!${NC}"
+        echo -e "${BLUE}🚀 Starting Letta Memory Agent...${NC}"
+        echo -e "${GREEN}✓ Backend: Claude $MODEL_NAME${NC}"
+        echo -e "${GREEN}✓ Memory: Letta-style prompting${NC}"
         echo ""
         exec claude --model "$MODEL_NAME" --system-prompt "$system_prompt"
         ;;
