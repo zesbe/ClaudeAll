@@ -1049,7 +1049,7 @@ if [[ -z "$choice" ]]; then
     echo " 14) Moonshot (API Key)                   🌙 Kawaii AI"
     echo " 15) Qwen (API Key)                       🇨🇳 Alibaba"
     echo " 16) OpenRouter (Multi-provider)           🔀 All-in-one"
-    echo " 17) Letta AI (GPT-5.2, Claude 4.5)      🧠 Model Selection"
+    echo " 17) Letta AI (Memory Agent)             🧠 Opus/Sonnet/Haiku"
     echo ""
     echo -e "${YELLOW}🔧 TOOLS & UTILITIES:${NC}"
     echo " 18) 🔑 API Key Manager                   🔐 View/Edit/Delete Keys"
@@ -2121,82 +2121,46 @@ EOF
         fi
         export LETTA_API_KEY
 
-        # Letta model selection like GLM
-        echo -e "${CYAN}Choose your Letta model for optimal performance:${NC}"
+        # Letta model selection - REAL Claude models only
+        echo -e "${CYAN}Choose Claude model for Letta AI:${NC}"
         echo ""
-        echo "🚀 LETTA MODEL SELECTION:"
-        echo "  1) GPT-5.2 (Latest)                   🎯 Most powerful model"
-        echo "  2) GPT-5.1 Codex Max                 💻 Advanced coding & reasoning"
-        echo "  3) Claude Sonnet 4.5                  🧠 Balanced performance"
-        echo "  4) Claude Sonnet 4                    ⚡ Fast & efficient"
-        echo "  5) Claude Opus 4.5                    🔬 Deep reasoning & analysis"
-        echo "  6) Gemini 3 Pro                      🌐 Google's latest multimodal"
-        echo "  7) Gemini 2.5 Pro                    🚀 Advanced multimodal"
-        echo "  8) Custom model                      🔧 Enter your own model"
+        echo "🚀 CLAUDE MODEL SELECTION:"
+        echo "  1) Claude Opus (opus)                🔬 Most powerful - Deep reasoning"
+        echo "  2) Claude Sonnet (sonnet)            🧠 Balanced - Speed & capability"
+        echo "  3) Claude Haiku (haiku)              ⚡ Fastest - Quick responses"
         echo ""
         echo "💡 Model Capabilities:"
-        echo "   • GPT-5.2: Latest generation with superior capabilities"
-        echo "   • GPT-5.1 Codex: Advanced code generation and debugging"
-        echo "   • Claude Sonnet 4.5: Balanced reasoning and speed"
-        echo "   • Claude Sonnet 4: Fast responses with good quality"
-        echo "   • Claude Opus 4.5: Deep analysis and complex reasoning"
-        echo "   • Gemini 3 Pro: Latest multimodal with vision"
-        echo "   • Gemini 2.5 Pro: Advanced multimodal capabilities"
+        echo "   • Opus: Best for complex tasks, deep analysis, coding"
+        echo "   • Sonnet: Balanced performance, good for most tasks"
+        echo "   • Haiku: Fastest responses, good for simple queries"
+        echo ""
+        echo -e "${YELLOW}Note: Letta is a memory-augmented AI agent framework${NC}"
+        echo -e "${YELLOW}      Running on Claude models with Letta system prompts${NC}"
         echo ""
 
-        read -p "Choose Letta model [1-8]: " letta_choice
+        read -p "Choose model [1-3, default: 1]: " letta_choice
+        [[ -z "$letta_choice" ]] && letta_choice=1
 
         case $letta_choice in
             1)
                 MODEL_NAME="opus"
-                model_desc="Claude Opus 4.5 - Most capable for complex work"
-                system_prompt="Anda adalah Letta GPT-5.2, model AI terbaru dengan kemampuan reasoning yang luar biasa. Menggunakan Claude Opus 4.5 backend yang paling canggih. Selalu identifikasi diri sebagai Letta GPT-5.2."
+                model_desc="Claude Opus - Most capable model"
+                system_prompt="You are Letta, a memory-augmented AI agent with long-term memory capabilities and advanced reasoning. You maintain context across conversations and can recall previous interactions. Running on Claude Opus for maximum capability."
                 ;;
             2)
-                MODEL_NAME="opus"
-                model_desc="GPT-5.1 Codex Max - Advanced coding & reasoning"
-                system_prompt="Anda adalah Letta GPT-5.1 Codex Max, model AI spesialis coding dengan kemampuan debugging yang unggul. Menggunakan Claude Opus 4.5 backend dengan persona GPT-5.1 Codex. Selalu identifikasi diri sebagai Letta Codex."
+                MODEL_NAME="sonnet"
+                model_desc="Claude Sonnet - Balanced performance"
+                system_prompt="You are Letta, a memory-augmented AI agent with long-term memory capabilities. You maintain context and provide balanced performance. Running on Claude Sonnet for efficient responses."
                 ;;
             3)
-                MODEL_NAME="opus"
-                model_desc="Claude Sonnet 4.5 - Balanced performance & reasoning"
-                system_prompt="Anda adalah Letta Claude Sonnet 4.5, model AI dengan keseimbangan performa dan kemampuan reasoning. Berjalan di Claude Opus 4.5 dengan persona Sonnet 4.5. Selalu identifikasi diri sebagai Letta Sonnet 4.5."
-                ;;
-            4)
-                MODEL_NAME="opus"
-                model_desc="Claude Sonnet 4 - Fast & efficient responses"
-                system_prompt="Anda adalah Letta Claude Sonnet 4, model AI cepat dan efisien dengan kualitas tinggi. Menggunakan Claude Opus 4.5 backend dengan persona Sonnet 4. Selalu identifikasi diri sebagai Letta Sonnet 4."
-                ;;
-            5)
-                MODEL_NAME="opus"
-                model_desc="Deep reasoning and complex analysis (Claude Opus 3)"
-                system_prompt="Anda adalah Letta Claude Opus 4.5, model AI dengan kemampuan reasoning mendalam dan analisis kompleks. Menggunakan Claude Opus backend dengan persona Opus 4.5. Selalu identifikasi diri sebagai Letta Opus 4.5."
-                ;;
-            6)
-                MODEL_NAME="opus"
-                model_desc="Gemini 3 Pro - Google's latest multimodal AI"
-                system_prompt="Anda adalah Letta Gemini 3 Pro, model AI multimodal terbaru dari Google dengan kemampuan vision. Berjalan di Claude Opus 4.5 dengan persona Gemini 3 Pro. Selalu identifikasi diri sebagai Letta Gemini 3 Pro."
-                ;;
-            7)
-                MODEL_NAME="opus"
-                model_desc="Gemini 2.5 Pro - Advanced multimodal capabilities"
-                system_prompt="Anda adalah Letta Gemini 2.5 Pro, model AI multimodal dengan kemampuan enhanced. Menggunakan Claude Opus 4.5 backend dengan persona Gemini 2.5 Pro. Selalu identifikasi diri sebagai Letta Gemini 2.5 Pro."
-                ;;
-            8)
-                echo -e "${YELLOW}Available Claude CLI models:${NC}"
-                echo "• sonnet (Claude Sonnet 3.5) - Fast & balanced"
-                echo "• opus (Claude Opus 3) - Advanced reasoning"
-                echo "• haiku (Claude Haiku) - Quick responses"
-                echo ""
-                read -p "Enter Claude CLI model: " MODEL_NAME
-                [[ -z "$MODEL_NAME" ]] && MODEL_NAME="opus"
-                model_desc="Custom Claude model: $MODEL_NAME"
-                system_prompt="Anda adalah Letta, model AI dengan memory jangka panjang dan kemampuan reasoning unggul. Menggunakan Claude $MODEL_NAME backend. Selalu identifikasi diri sebagai Letta."
+                MODEL_NAME="haiku"
+                model_desc="Claude Haiku - Fast responses"
+                system_prompt="You are Letta, a memory-augmented AI agent focused on quick, efficient responses while maintaining memory capabilities. Running on Claude Haiku for speed."
                 ;;
             *)
                 MODEL_NAME="opus"
-                model_desc="Default Claude Opus 4.5"
-                system_prompt="Anda adalah Letta GPT-5.2, model AI terbaru dengan kemampuan reasoning yang luar biasa. Menggunakan Claude Opus 4.5 backend. Selalu identifikasi diri sebagai Letta GPT-5.2."
+                model_desc="Claude Opus (default)"
+                system_prompt="You are Letta, a memory-augmented AI agent with long-term memory capabilities and advanced reasoning. Running on Claude Opus."
                 ;;
         esac
 
