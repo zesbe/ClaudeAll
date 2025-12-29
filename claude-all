@@ -117,10 +117,8 @@ GLM_API_KEY_FILE="$USER_HOME/.glm_api_key"
 MINIMAX_API_KEY_FILE="$USER_HOME/.minimax_api_key"
 
 # Configuration
-LITELLM_PORT=8555
 MODEL_OVERRIDE=""
 SELECTED_MODEL=""
-LITELLM_HOST="http://127.0.0.1:$LITELLM_PORT"
 
 # Function to get custom models
 get_custom_models() {
@@ -418,14 +416,6 @@ check_dependencies() {
             exit 1
         fi
     fi
-
-    # Check for litellm (only needed for some providers)
-    if ! python3 -m pip show litellm &> /dev/null; then
-        echo -e "${YELLOW}'litellm' not found. Installing via pip...${NC}"
-        python3 -m pip install litellm[proxy] || {
-            echo -e "${YELLOW}Failed to install litellm. Some features may not work.${NC}"
-        }
-    fi
 }
 
 check_gemini_oauth() {
@@ -508,117 +498,13 @@ check_openai_oauth() {
     OPENAI_ACCESS_TOKEN=$(python3 -c "import json, os; print(json.load(open(os.path.expanduser('$cred_path')))['access_token'])" 2>/dev/null || echo "")
     export OPENAI_API_KEY="$OPENAI_ACCESS_TOKEN"
 }
-
-start_litellm_proxy() {
-    local model=$1
-    echo -e "${BLUE}Starting LiteLLM proxy for model: $model...${NC}"
-
-    # Clean up any existing processes first
-    cleanup_litellm_processes
-
-    # Start litellm in background with proper error handling
-    local log_file="/tmp/litellm_$$.log"
-    if ! python3 -m litellm --model "$model" --port $LITELLM_PORT --drop_params &> "$log_file" & then
-        echo -e "${RED}Error: Failed to start LiteLLM process${NC}" >&2
-        cat "$log_file" 2>/dev/null || true
-        return 1
-    fi
-
-    LITELLM_PID=$!
-
-    # Verify the process is actually running
-    if ! kill -0 $LITELLM_PID 2>/dev/null; then
-        echo -e "${RED}Error: LiteLLM process failed to start${NC}" >&2
-        cat "$log_file" 2>/dev/null || true
-        return 1
-    fi
-
-    # Wait for it to be ready with improved timeout
-    echo -n "Waiting for proxy to start"
-    local max_attempts=15
-    local attempt=1
-
-    while [[ $attempt -le $max_attempts ]]; do
-        if curl -s --connect-timeout 2 --max-time 3 "$LITELLM_HOST/health" &> /dev/null; then
-            echo -e " ${GREEN}Ready!${NC}"
-            echo "LiteLLM PID: $LITELLM_PID" > "$log_file"
-            return 0
-        fi
-
-        # Check if process is still alive
-        if ! kill -0 $LITELLM_PID 2>/dev/null; then
-            echo -e "\n${RED}Error: LiteLLM process died during startup${NC}" >&2
-            cat "$log_file" 2>/dev/null || true
-            return 1
-        fi
-
-        sleep 1
-        echo -n "."
-        ((attempt++))
-    done
-
-    echo -e "\n${RED}Timeout: Failed to start LiteLLM proxy after $max_attempts attempts${NC}" >&2
-    echo "Log file: $log_file" >&2
-    cat "$log_file" 2>/dev/null || true
-    cleanup_litellm_processes
-    return 1
-}
-
-cleanup_litellm_processes() {
-    # Kill any existing litellm on this port with better error handling
-    case "$PLATFORM" in
-        "Darwin")
-            # macOS - use lsof
-            local pids
-            pids=$(lsof -ti:$LITELLM_PORT 2>/dev/null) || true
-            if [[ -n "$pids" ]]; then
-                echo "$pids" | xargs kill -TERM 2>/dev/null || true
-                sleep 1
-                # Force kill if still running
-                echo "$pids" | xargs kill -KILL 2>/dev/null || true
-            fi
-            ;;
-        "Windows")
-            # Windows - use netstat
-            local pids
-            pids=$(netstat -ano 2>/dev/null | grep ":$LITELLM_PORT" | awk '{print $5}' | grep -v '^$') || true
-            for pid in $pids; do
-                taskkill //F //PID "$pid" &>/dev/null || true
-            done
-            ;;
-        *)
-            # Linux/Termux - use fuser
-            fuser -k "$LITELLM_PORT/tcp" &>/dev/null || true
-            # Also try pkill for litellm processes
-            pkill -f "litellm.*--port.*$LITELLM_PORT" &>/dev/null || true
-            ;;
-    esac
-}
-
 cleanup() {
     echo -e "\n${BLUE}Cleaning up processes...${NC}"
-
-    # Clean up our specific LiteLLM process
-    if [[ -n "$LITELLM_PID" ]]; then
-        echo "Stopping LiteLLM proxy (PID: $LITELLM_PID)..."
-        if kill -0 "$LITELLM_PID" 2>/dev/null; then
-            kill -TERM "$LITELLM_PID" 2>/dev/null || true
-            sleep 2
-            # Force kill if still running
-            kill -KILL "$LITELLM_PID" 2>/dev/null || true
-        fi
-    fi
-
-    # General cleanup of any litellm processes on our port
-    cleanup_litellm_processes
-
+    
     # Clean up temp files
     if [[ -n "$SCRIPT_DIR" ]]; then
         rm -f "$SCRIPT_DIR"/.*_models.tmp 2>/dev/null || true
     fi
-
-    # Clean up log files
-    rm -f /tmp/litellm_$$.log 2>/dev/null || true
 }
 
 trap cleanup EXIT
@@ -1013,10 +899,9 @@ setup_ollama() {
     check_dependencies
     echo -e "${BLUE}Configuring for Ollama (Local)...${NC}"
     echo -e "${YELLOW}Note: Make sure Ollama is running locally${NC}"
-    start_litellm_proxy "ollama/llama3"
-    export ANTHROPIC_BASE_URL="$LITELLM_HOST"
-    export ANTHROPIC_API_KEY="sk-litellm"
-    exec claude "$@"
+    export ANTHROPIC_BASE_URL="http://localhost:11434/v1"
+    export ANTHROPIC_API_KEY="ollama"
+    exec claude --no-chrome "$@"
 }
 
 # Main Menu
@@ -1967,11 +1852,10 @@ EOF
         read -p "Enter Model Name [default: llama3]: " input_model
         [[ -n "$input_model" ]] && MODEL_NAME=$input_model
 
-        start_litellm_proxy "ollama/$MODEL_NAME"
-        export ANTHROPIC_BASE_URL="$LITELLM_HOST"
-        export ANTHROPIC_API_KEY="sk-litellm"
-        echo -e "${BLUE}🚀 Starting Ollama chat via LiteLLM...${NC}"
-        exec claude "$@"
+        export ANTHROPIC_BASE_URL="http://localhost:11434/v1"
+        export ANTHROPIC_API_KEY="ollama"
+        echo -e "${BLUE}🚀 Starting Ollama chat...${NC}"
+        exec claude --no-chrome --model "$MODEL_NAME" "$@"
         ;;
     13)
         # Mistral
@@ -2246,7 +2130,7 @@ EOFMODEL
                 if ls "$MODEL_DIR"/*.json &>/dev/null; then
                     for f in "$MODEL_DIR"/*.json; do
                         name=$(basename "$f" .json)
-                        desc=$(grep -o '"description"[^,]*' "$f" | cut -d'"' -f4)
+                        desc=$(grep -o '"description"[^,]*' "$f" 2>/dev/null | cut -d'"' -f4)
                         echo "  • $name - $desc"
                     done
                 else
@@ -2256,15 +2140,22 @@ EOFMODEL
             3)
                 echo ""
                 if ls "$MODEL_DIR"/*.json &>/dev/null; then
-                    echo "Model yang bisa dihapus:"
-                    select model_file in "$MODEL_DIR"/*.json "Batal"; do
-                        if [[ "$model_file" == "Batal" ]] || [[ -z "$model_file" ]]; then
-                            break
-                        fi
-                        rm -f "$model_file"
-                        echo -e "${GREEN}✓ Model dihapus${NC}"
-                        break
+                    echo -e "${CYAN}Model yang bisa dihapus:${NC}"
+                    i=1
+                    declare -a model_files
+                    for f in "$MODEL_DIR"/*.json; do
+                        model_files[$i]="$f"
+                        echo "  $i) $(basename "$f" .json)"
+                        ((i++))
                     done
+                    echo ""
+                    read -p "Pilih nomor untuk hapus (0=batal): " del_num
+                    if [[ "$del_num" =~ ^[0-9]+$ ]] && [[ "$del_num" -gt 0 ]] && [[ -n "${model_files[$del_num]}" ]]; then
+                        rm -f "${model_files[$del_num]}"
+                        echo -e "${GREEN}✓ Model dihapus${NC}"
+                    else
+                        echo "Batal"
+                    fi
                 else
                     echo "Tidak ada model untuk dihapus"
                 fi
@@ -2396,16 +2287,17 @@ except:
         fi
         ;;
     22)
-        # Custom (legacy)
+        # Custom API Endpoint
         check_dependencies
-        echo -e "${BLUE}Configuring Custom LiteLLM Model...${NC}"
-        read -p "Enter LiteLLM Model String: " MODEL_NAME
-        read -p "Press Enter to continue..."
+        echo -e "${BLUE}Configuring Custom API Endpoint...${NC}"
+        read -p "Enter API Base URL (e.g. https://api.example.com/v1): " CUSTOM_BASE
+        read -p "Enter API Key: " CUSTOM_KEY
+        read -p "Enter Model Name: " MODEL_NAME
 
-        start_litellm_proxy "$MODEL_NAME"
-        export ANTHROPIC_BASE_URL="$LITELLM_HOST"
-        export ANTHROPIC_API_KEY="sk-litellm"
-        exec claude "$@"
+        export ANTHROPIC_BASE_URL="$CUSTOM_BASE"
+        export ANTHROPIC_API_KEY="$CUSTOM_KEY"
+        echo -e "${BLUE}🚀 Starting with custom endpoint...${NC}"
+        exec claude --no-chrome --model "$MODEL_NAME" "$@"
         ;;
 esac
 
