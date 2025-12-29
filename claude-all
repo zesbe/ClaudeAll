@@ -2110,7 +2110,7 @@ EOF
         echo "  2) Sonnet  🧠 Balanced - Default (Recommended)"
         echo "  3) Haiku   ⚡ Fastest - Quick responses"
         echo "  4) GPT-4o  🤖 OpenAI - ChatGPT Flagship"
-        echo "  5) Gemini  🌟 Google - Gemini 1.5 Pro"
+        echo "  5) Gemini  🌟 Google - Gemini 2.0 Flash"
         echo ""
         read -p "Pilih [1-5, default: 2]: " model_choice
         [[ -z "$model_choice" ]] && model_choice=2
@@ -2139,14 +2139,14 @@ EOF
                 exec claude --no-chrome --model "gpt-4o" --system-prompt "$system_prompt"
                 ;;
             5)
-                echo -e "${GREEN}✓ Model: Gemini 1.5 Pro${NC}"
+                echo -e "${GREEN}✓ Model: Gemini 2.0 Flash${NC}"
                 # Configure Gemini
                 get_api_key_with_save "GEMINI_API_KEY" "$HOME/.gemini_api_key" "Gemini" "https://aistudio.google.com/app/apikey"
                 export ANTHROPIC_API_KEY="$GEMINI_API_KEY"
                 export ANTHROPIC_BASE_URL="https://generativelanguage.googleapis.com/v1beta/anthropic"
                 
                 echo -e "${BLUE}🚀 Starting Letta with Gemini...${NC}"
-                exec claude --no-chrome --model "gemini-1.5-pro" --system-prompt "$system_prompt"
+                exec claude --no-chrome --model "gemini-2.0-flash-exp" --system-prompt "$system_prompt"
                 ;;
             2|*)
                 echo -e "${GREEN}✓ Model: Claude Sonnet${NC}"
@@ -2164,80 +2164,117 @@ EOF
     19)
         # Claude Master Tool
         echo -e "${BLUE}Opening Claude Master Tool...${NC}"
-        # Check if claude-master exists in the same directory
-        if [[ -f "$SCRIPT_DIR/claude-master" ]]; then
-            "$SCRIPT_DIR/claude-master"
-        else
-            # Try claude-suite version
-            if [[ -f "$SCRIPT_DIR/../claude-suite/utils/claude_master.py" ]]; then
-                python3 "$SCRIPT_DIR/../claude-suite/utils/claude_master.py"
-            else
-                echo -e "${YELLOW}Claude Master Tool not found. Please install or check path.${NC}"
+        
+        # Try multiple possible locations
+        MASTER_TOOL=""
+        for path in \
+            "$SCRIPT_DIR/claude-master" \
+            "$SCRIPT_DIR/claude-suite/utils/claude_master.py" \
+            "$SCRIPT_DIR/../claude-suite/utils/claude_master.py" \
+            "$HOME/ClaudeAll/claude-suite/utils/claude_master.py" \
+            "/data/data/com.termux/files/home/ClaudeAll/claude-suite/utils/claude_master.py"
+        do
+            if [[ -f "$path" ]]; then
+                MASTER_TOOL="$path"
+                break
             fi
+        done
+        
+        if [[ -n "$MASTER_TOOL" ]]; then
+            if [[ "$MASTER_TOOL" == *.py ]]; then
+                python3 "$MASTER_TOOL"
+            else
+                "$MASTER_TOOL"
+            fi
+        else
+            echo -e "${YELLOW}Claude Master Tool not found.${NC}"
+            echo -e "${CYAN}Tip: Clone repo to ~/ClaudeAll for full features${NC}"
         fi
         echo ""
         echo -e "${YELLOW}Press Enter to return to main menu...${NC}"
         read
-        # Restart the menu
         exec "$0"
         ;;
     20)
         # Add/Edit/Delete Models
-        echo -e "${BLUE}Opening Model Management...${NC}"
-        # Check if model-management script exists
-        if [[ -f "$SCRIPT_DIR/model-selector" ]]; then
-            "$SCRIPT_DIR/model-selector"
-        elif [[ -f "$SCRIPT_DIR/add-model" ]]; then
-            "$SCRIPT_DIR/add-model"
-        else
-            echo -e "${YELLOW}Model Management tool not found.${NC}"
-            echo "Available model operations:"
-            echo "1. Add custom model"
-            echo "2. List existing models"
-            echo "3. Delete model"
-            echo "4. Back to main menu"
-            echo ""
-            read -p "Choose operation [1-4]: " model_op
+        echo -e "${BLUE}⚙️ Model Management${NC}"
+        echo ""
+        
+        # Find model directory
+        MODEL_DIR=""
+        for path in "$SCRIPT_DIR/model" "$HOME/ClaudeAll/model" "/data/data/com.termux/files/home/ClaudeAll/model"; do
+            if [[ -d "$path" ]]; then
+                MODEL_DIR="$path"
+                break
+            fi
+        done
+        
+        [[ -z "$MODEL_DIR" ]] && MODEL_DIR="$HOME/.claude-all/models" && mkdir -p "$MODEL_DIR"
+        
+        echo "Pilih operasi:"
+        echo "  1) ➕ Tambah model baru"
+        echo "  2) 📋 Lihat semua model"
+        echo "  3) ❌ Hapus model"
+        echo "  4) 🔙 Kembali"
+        echo ""
+        read -p "Pilih [1-4]: " model_op
 
-            case $model_op in
-                1)
-                    read -p "Enter provider name: " provider_name
-                    read -p "Enter model identifier: " model_id
-                    read -p "Enter description: " description
-                    filename=$(echo "$provider_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g').json
-
-                    cat > "$SCRIPT_DIR/model/$filename" << EOF
+        case $model_op in
+            1)
+                echo ""
+                read -p "Nama provider (contoh: MyAI): " provider_name
+                read -p "Model ID (contoh: gpt-4): " model_id
+                read -p "API Base URL: " api_base
+                read -p "Deskripsi: " description
+                
+                filename=$(echo "$provider_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g').json
+                
+                cat > "$MODEL_DIR/$filename" << EOFMODEL
 {
     "provider_name": "$provider_name",
     "description": "$description",
-    "api_key": "SET_YOUR_${provider_name^^}_API_KEY_HERE",
-    "api_base": "https://api.example.com/v1/",
+    "api_base": "$api_base",
     "model": "$model_id",
-    "notes": "Custom configuration"
+    "created": "$(date -Iseconds)"
 }
-EOF
-                    echo -e "${GREEN}✓ Model configuration saved to model/$filename${NC}"
-                    ;;
-                2)
-                    echo "Available model configurations:"
-                    ls -la "$SCRIPT_DIR/model/"*.json 2>/dev/null | while read f; do
-                        basename "$f"
+EOFMODEL
+                echo -e "${GREEN}✓ Model disimpan: $MODEL_DIR/$filename${NC}"
+                ;;
+            2)
+                echo ""
+                echo -e "${CYAN}Model tersedia:${NC}"
+                if ls "$MODEL_DIR"/*.json &>/dev/null; then
+                    for f in "$MODEL_DIR"/*.json; do
+                        name=$(basename "$f" .json)
+                        desc=$(grep -o '"description"[^,]*' "$f" | cut -d'"' -f4)
+                        echo "  • $name - $desc"
                     done
-                    ;;
-                3)
-                    echo "Available model configurations:"
-                    ls -la "$SCRIPT_DIR/model/"*.json 2>/dev/null | nl
-                    read -p "Enter number to delete: " del_num
-                    # Simple deletion logic would go here
-                    echo "Model deletion feature requires implementation"
-                    ;;
-                *)
-                    echo "Returning to main menu..."
-                    ;;
-            esac
-        fi
+                else
+                    echo "  (belum ada model custom)"
+                fi
+                ;;
+            3)
+                echo ""
+                if ls "$MODEL_DIR"/*.json &>/dev/null; then
+                    echo "Model yang bisa dihapus:"
+                    select model_file in "$MODEL_DIR"/*.json "Batal"; do
+                        if [[ "$model_file" == "Batal" ]] || [[ -z "$model_file" ]]; then
+                            break
+                        fi
+                        rm -f "$model_file"
+                        echo -e "${GREEN}✓ Model dihapus${NC}"
+                        break
+                    done
+                else
+                    echo "Tidak ada model untuk dihapus"
+                fi
+                ;;
+            *)
+                echo "Kembali ke menu utama..."
+                ;;
+        esac
         echo ""
-        echo -e "${YELLOW}Press Enter to return to main menu...${NC}"
+        echo -e "${YELLOW}Press Enter untuk kembali...${NC}"
         read
         # Restart the menu
         exec "$0"
