@@ -32,13 +32,14 @@ Examples:
   claude-all 8 -m llama-3.3-70b-versatile
 
   # Direct message (no need for /model prefix)
-  echo "Write a function" | claude-all 7 --model glm-4.6
+  echo "Write a function" | claude-all 7 --model glm-4.7
 
 Available Models by Provider:
 -----------------------------
 
 GLM (7):
-  - glm-4.6 (default)
+  - glm-4.7 (default)
+  - glm-4.6
   - glm-4.6-flash
   - glm-4.6-plus
   - glm-4.5-air

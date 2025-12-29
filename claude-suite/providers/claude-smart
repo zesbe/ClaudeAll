@@ -80,16 +80,18 @@ if [[ -z "$MODEL_NAME" ]]; then
     echo "2) claude-3-haiku-latest (Fast)"
     echo ""
     echo "GLM MODELS:"
-    echo "3) glm-4.6 (GLM Flagship)"
-    echo "4) glm-4.5-air (GLM Fast)"
+    echo "3) glm-4.7 (GLM Latest Flagship)"
+    echo "4) glm-4.6 (GLM Previous Flagship)"
+    echo "5) glm-4.5-air (GLM Fast)"
     echo ""
-    read -p "Select model [1-4]: " choice
+    read -p "Select model [1-5]: " choice
 
     case $choice in
         1) MODEL_NAME="claude-3-5-sonnet-latest"; CURRENT_PROVIDER="anthropic" ;;
         2) MODEL_NAME="claude-3-haiku-latest"; CURRENT_PROVIDER="anthropic" ;;
-        3) MODEL_NAME="glm-4.6"; CURRENT_PROVIDER="glm" ;;
-        4) MODEL_NAME="glm-4.5-air"; CURRENT_PROVIDER="glm" ;;
+        3) MODEL_NAME="glm-4.7"; CURRENT_PROVIDER="glm" ;;
+        4) MODEL_NAME="glm-4.6"; CURRENT_PROVIDER="glm" ;;
+        5) MODEL_NAME="glm-4.5-air"; CURRENT_PROVIDER="glm" ;;
         *) MODEL_NAME="claude-3-5-sonnet-latest"; CURRENT_PROVIDER="anthropic" ;;
     esac
 fi

@@ -45,7 +45,7 @@ export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
 export ANTHROPIC_API_KEY="$API_KEY"
 
 # Model name from argument or default
-MODEL_NAME="${1:-glm-4.6}"
+MODEL_NAME="${1:-glm-4.7}"
 
 echo -e "${BLUE}Starting GLM Chat${NC}"
 echo -e "${GREEN}Model: $MODEL_NAME${NC}"

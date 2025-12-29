@@ -1692,10 +1692,10 @@ case $choice in
         export ANTHROPIC_AUTH_TOKEN
 
         # Use default GLM model
-        MODEL_NAME="glm-4.6"
-        echo -e "${GREEN}✓ Using GLM model: glm-4.6${NC}"
-        echo -e "${YELLOW}Available models: glm-4.6, glm-4.5-air, glm-4-flash${NC}"
-        read -p "Enter Model Name [default: glm-4.6]: " input_model
+        MODEL_NAME="glm-4.7"
+        echo -e "${GREEN}✓ Using GLM model: glm-4.7${NC}"
+        echo -e "${YELLOW}Available models: glm-4.7, glm-4.6, glm-4.5-air, glm-4-flash${NC}"
+        read -p "Enter Model Name [default: glm-4.7]: " input_model
         [[ -n "$input_model" ]] && MODEL_NAME=$input_model
 
         export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
