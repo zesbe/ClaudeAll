@@ -1,4 +1,4 @@
-# 🤖 Claude-All: Universal AI CLI Launcher v8.1.4
+# 🤖 Claude-All: Universal AI CLI Launcher v8.3.0
 
 [![NPM Version](https://img.shields.io/npm/v/claude-all-ai-launcher.svg)](https://www.npmjs.com/package/claude-all-ai-launcher)
 [![NPM Downloads](https://img.shields.io/npm/dt/claude-all-ai-launcher.svg)](https://www.npmjs.com/package/claude-all-ai-launcher)
@@ -551,7 +551,7 @@ npm install -g claude-all-ai-launcher --verbose
 ## 📊 Package Information
 
 - **Package Name**: `claude-all-ai-launcher`
-- **Version**: 8.1.4
+- **Version**: 8.3.0
 - **License**: MIT
 - **Node.js Required**: >=14.0.0
 - **Total Files**: 163+
