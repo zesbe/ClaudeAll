@@ -1497,7 +1497,7 @@ case $choice in
                 export ANTHROPIC_API_KEY="$GEMINI_API_KEY"
                 
                 echo -e "${BLUE}🚀 Starting Gemini...${NC}"
-                exec claude --no-chrome --model "gemini-2.0-flash-exp" "$@"
+                exec claude --dangerously-skip-permissions --no-chrome --model "gemini-2.0-flash-exp" "$@"
                 ;;
             2)
                 # CCS OAuth method
@@ -1522,7 +1522,7 @@ case $choice in
                 export ANTHROPIC_API_KEY="$PROXY_KEY"
                 
                 echo -e "${BLUE}🚀 Starting dengan custom proxy...${NC}"
-                exec claude --no-chrome "$@"
+                exec claude --dangerously-skip-permissions --no-chrome "$@"
                 ;;
             *)
                 echo "Kembali ke menu..."
@@ -2068,12 +2068,12 @@ EOF
             1)
                 echo -e "${GREEN}✓ Model: Claude Opus${NC}"
                 echo -e "${BLUE}🚀 Starting Letta...${NC}"
-                exec claude --no-chrome --model "opus" --system-prompt "$system_prompt"
+                exec claude --dangerously-skip-permissions --no-chrome --model "opus" --system-prompt "$system_prompt"
                 ;;
             3)
                 echo -e "${GREEN}✓ Model: Claude Haiku${NC}"
                 echo -e "${BLUE}🚀 Starting Letta...${NC}"
-                exec claude --no-chrome --model "haiku" --system-prompt "$system_prompt"
+                exec claude --dangerously-skip-permissions --no-chrome --model "haiku" --system-prompt "$system_prompt"
                 ;;
             4)
                 echo -e "${GREEN}✓ Model: GPT-4o${NC}"
@@ -2081,9 +2081,9 @@ EOF
                 get_api_key_with_save "OPENAI_API_KEY" "$HOME/.openai_api_key" "OpenAI" "https://platform.openai.com/api-keys"
                 export ANTHROPIC_API_KEY="$OPENAI_API_KEY"
                 export ANTHROPIC_BASE_URL="https://api.openai.com/v1"
-                
+
                 echo -e "${BLUE}🚀 Starting Letta with GPT-4o...${NC}"
-                exec claude --no-chrome --model "gpt-4o" --system-prompt "$system_prompt"
+                exec claude --dangerously-skip-permissions --no-chrome --model "gpt-4o" --system-prompt "$system_prompt"
                 ;;
             5)
                 echo -e "${GREEN}✓ Model: Gemini 2.0 Flash${NC}"
@@ -2091,14 +2091,14 @@ EOF
                 get_api_key_with_save "GEMINI_API_KEY" "$HOME/.gemini_api_key" "Gemini" "https://aistudio.google.com/app/apikey"
                 export ANTHROPIC_API_KEY="$GEMINI_API_KEY"
                 export ANTHROPIC_BASE_URL="https://generativelanguage.googleapis.com/v1beta/anthropic"
-                
+
                 echo -e "${BLUE}🚀 Starting Letta with Gemini...${NC}"
-                exec claude --no-chrome --model "gemini-2.0-flash-exp" --system-prompt "$system_prompt"
+                exec claude --dangerously-skip-permissions --no-chrome --model "gemini-2.0-flash-exp" --system-prompt "$system_prompt"
                 ;;
             2|*)
                 echo -e "${GREEN}✓ Model: Claude Sonnet${NC}"
                 echo -e "${BLUE}🚀 Starting Letta...${NC}"
-                exec claude --no-chrome --model "sonnet" --system-prompt "$system_prompt"
+                exec claude --dangerously-skip-permissions --no-chrome --model "sonnet" --system-prompt "$system_prompt"
                 ;;
         esac
         ;;
