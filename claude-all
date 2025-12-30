@@ -283,7 +283,7 @@ handle_custom_model() {
     local system_prompt="Anda adalah ${provider_name}, model AI dari ${model_name}. Selalu identifikasi diri sebagai ${provider_name} dalam setiap respons."
 
     # Execute Claude directly
-    exec claude --model "$claude_model" --system-prompt "$system_prompt" "$@"
+    exec claude --dangerously-skip-permissions --model "$claude_model" --system-prompt "$system_prompt" "$@"
 }
 
 # Get script directory (portable)
@@ -746,7 +746,7 @@ setup_minimax() {
         check_dependencies
         echo -e "${BLUE}Starting MiniMax session...${NC}"
         export MINIMAX_API_KEY="$API_KEY"
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -757,7 +757,7 @@ setup_gemini_api() {
         echo -e "${BLUE}Configuring for Google Gemini (API Key)...${NC}"
         echo -e "${YELLOW}Get API Key: https://aistudio.google.com/app/apikey${NC}"
         export GEMINI_API_KEY="$API_KEY"
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -772,7 +772,7 @@ setup_gemini_oauth() {
         echo -e "${BLUE}Using Google Internal Authentication (AntiGravity)${NC}"
         export CLOUD_ML helicopterauto
         GOOGLE_AUTH_TOKEN=$(python3 "$SCRIPT_DIR/get_google_access_token.py")
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -782,7 +782,7 @@ setup_openai() {
         check_dependencies
         echo -e "${BLUE}Configuring for OpenAI...${NC}"
         export OPENAI_API_KEY="$API_KEY"
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -798,7 +798,7 @@ setup_xai() {
         echo -e "${BLUE}Configuring for xAI / Grok...${NC}"
         echo -e "${YELLOW}Get Key: https://console.x.ai/${NC}"
         export XAI_API_KEY="$API_KEY"
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -810,7 +810,7 @@ setup_glm() {
         echo -e "${BLUE}Configuring for ZhipuAI / GLM...${NC}"
         export GLM_API_KEY="$API_KEY"
         export MODEL_NAME="$MODEL"
-        exec claude --model "$MODEL" "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL" "$@"
     fi
 }
 
@@ -820,7 +820,7 @@ setup_groq() {
         check_dependencies
         echo -e "${BLUE}Configuring for Groq...${NC}"
         export GROQ_API_KEY="$API_KEY"
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -831,7 +831,7 @@ setup_perplexity() {
         echo -e "${BLUE}Configuring for Perplexity...${NC}"
         echo -e "${YELLOW}Get Key: https://console.perplexity.ai/${NC}"
         export PERPLEXITY_API_KEY="$API_KEY"
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -841,7 +841,7 @@ setup_cohere() {
         check_dependencies
         echo -e "${BLUE}Configuring for Cohere...${NC}"
         export COHERE_API_KEY="$API_KEY"
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -851,7 +851,7 @@ setup_deepseek() {
         check_dependencies
         echo -e "${BLUE}Configuring for DeepSeek...${NC}"
         export DEEPSEEK_API_KEY="$API_KEY"
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -861,7 +861,7 @@ setup_mistral() {
         check_dependencies
         echo -e "${BLUE}Configuring for Mistral...${NC}"
         export MISTRAL_API_KEY="$API_KEY"
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -871,7 +871,7 @@ setup_moonshot() {
         check_dependencies
         echo -e "${BLUE}Configuring for Moonshot...${NC}"
         export MOONSHOT_API_KEY="$API_KEY"
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -881,7 +881,7 @@ setup_qwen() {
         check_dependencies
         echo -e "${BLUE}Configuring for Qwen...${NC}"
         export QWEN_API_KEY="$API_KEY"
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -891,7 +891,7 @@ setup_openrouter() {
         check_dependencies
         echo -e "${BLUE}Configuring for OpenRouter...${NC}"
         export OPENROUTER_API_KEY="$API_KEY"
-        exec claude "$@"
+        exec claude --dangerously-skip-permissions "$@"
     fi
 }
 
@@ -1292,7 +1292,7 @@ continue_chat_with_new_provider() {
     esac
 
     # Start chat with context preserved
-    exec claude --model "$new_model" "$@"
+    exec claude --dangerously-skip-permissions --model "$new_model" "$@"
 }
 
 # Model name will be set dynamically based on provider selection
@@ -1366,7 +1366,7 @@ case $choice in
         esac
 
         echo -e "${BLUE}🚀 Starting MiniMax chat with $FINAL_MODEL...${NC}"
-        exec claude --model "$FINAL_MODEL" --system-prompt "Anda adalah MiniMax AI. Model aktif: $FINAL_MODEL. Selalu identifikasi diri sebagai MiniMax dalam setiap respons." "$@"
+        exec claude --dangerously-skip-permissions --model "$FINAL_MODEL" --system-prompt "Anda adalah MiniMax AI. Model aktif: $FINAL_MODEL. Selalu identifikasi diri sebagai MiniMax dalam setiap respons." "$@"
         ;;
     2)
         # Gemini API Key - Direct Integration
@@ -1460,7 +1460,7 @@ case $choice in
 
         # Execute Claude with Gemini model and system prompt
         echo -e "${BLUE}🚀 Starting Gemini chat...${NC}"
-        exec claude --model "$CLAUDE_MODEL" --system-prompt "Anda adalah Gemini, model AI dari Google. Selalu identifikasi diri sebagai Gemini dalam setiap respons." "$@"
+        exec claude --dangerously-skip-permissions --model "$CLAUDE_MODEL" --system-prompt "Anda adalah Gemini, model AI dari Google. Selalu identifikasi diri sebagai Gemini dalam setiap respons." "$@"
         ;;
     3)
         # Google Gemini OAuth / Proxy
@@ -1602,7 +1602,7 @@ case $choice in
         export ANTHROPIC_BASE_URL="https://api.openai.com/v1"
         echo -e "${BLUE}🚀 Starting OpenAI chat via LiteLLM...${NC}"
         echo -e "${YELLOW}Note: Using OpenAI API through Claude interface${NC}"
-        exec claude --model "$MODEL_NAME" "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
         ;;
     5)
         # OpenAI OAuth (Experimental)
@@ -1637,7 +1637,7 @@ case $choice in
         export ANTHROPIC_BASE_URL="https://api.openai.com/v1"
         echo -e "${BLUE}🚀 Starting OpenAI chat via LiteLLM...${NC}"
         echo -e "${YELLOW}Note: Using OpenAI API through Claude interface${NC}"
-        exec claude --model "$MODEL_NAME" "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
         ;;
     6)
         # xAI
@@ -1669,7 +1669,7 @@ case $choice in
         export ANTHROPIC_BASE_URL="https://api.x.ai/v1/"
         export ANTHROPIC_API_KEY="$XAI_API_KEY"
         echo -e "${BLUE}🚀 Starting xAI (Grok) chat...${NC}"
-        exec claude --model "$MODEL_NAME" "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
         ;;
     7)
         # ZhipuAI / GLM
@@ -1756,7 +1756,7 @@ case $choice in
         export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
         export ANTHROPIC_API_KEY="$ANTHROPIC_AUTH_TOKEN"
         export CLAUDE_MODEL="$MODEL_NAME"
-        exec claude --model "$MODEL_NAME" --system-prompt "Anda adalah GLM, model AI dari ZhipuAI. Selalu identifikasi diri sebagai GLM dalam setiap respons." "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" --system-prompt "Anda adalah GLM, model AI dari ZhipuAI. Selalu identifikasi diri sebagai GLM dalam setiap respons." "$@"
         ;;
     8)
         # Groq
@@ -1788,7 +1788,7 @@ case $choice in
         export ANTHROPIC_BASE_URL="https://api.groq.com/openai/v1/"
         export ANTHROPIC_API_KEY="$GROQ_API_KEY"
         echo -e "${BLUE}🚀 Starting Groq chat...${NC}"
-        exec claude --model "$MODEL_NAME" "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
         ;;
     9)
         # Perplexity
@@ -1864,7 +1864,7 @@ EOF
         export ANTHROPIC_BASE_URL="https://api.cohere.ai/v1/"
         export ANTHROPIC_API_KEY="$COHERE_API_KEY"
         echo -e "${BLUE}🚀 Starting Cohere chat...${NC}"
-        exec claude --model "$MODEL_NAME" "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
         ;;
     11)
         # DeepSeek
@@ -1896,7 +1896,7 @@ EOF
         export ANTHROPIC_BASE_URL="https://api.deepseek.com/"
         export ANTHROPIC_API_KEY="$DEEPSEEK_API_KEY"
         echo -e "${BLUE}🚀 Starting DeepSeek chat...${NC}"
-        exec claude --model "$MODEL_NAME" "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
         ;;
     12)
         # Ollama
@@ -1950,7 +1950,7 @@ EOF
         export ANTHROPIC_BASE_URL="https://api.mistral.ai/v1/"
         export ANTHROPIC_API_KEY="$MISTRAL_API_KEY"
         echo -e "${BLUE}🚀 Starting Mistral chat...${NC}"
-        exec claude --model "$MODEL_NAME" "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
         ;;
     14)
         # Moonshot
@@ -1982,7 +1982,7 @@ EOF
         export ANTHROPIC_BASE_URL="https://api.moonshot.cn/v1/"
         export ANTHROPIC_API_KEY="$MOONSHOT_API_KEY"
         echo -e "${BLUE}🚀 Starting Moonshot chat...${NC}"
-        exec claude --model "$MODEL_NAME" "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
         ;;
     15)
         # Qwen
@@ -2014,7 +2014,7 @@ EOF
         export ANTHROPIC_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1/"
         export ANTHROPIC_API_KEY="$QWEN_API_KEY"
         echo -e "${BLUE}🚀 Starting Qwen chat...${NC}"
-        exec claude --model "$MODEL_NAME" "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
         ;;
     16)
         # OpenRouter
@@ -2046,7 +2046,7 @@ EOF
         export ANTHROPIC_BASE_URL="https://openrouter.ai/api/v1/"
         export ANTHROPIC_API_KEY="$OPENROUTER_API_KEY"
         echo -e "${BLUE}🚀 Starting OpenRouter chat...${NC}"
-        exec claude --model "$MODEL_NAME" "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
         ;;
     17)
         # Letta AI - Memory-Augmented Agent (Quick Select)
