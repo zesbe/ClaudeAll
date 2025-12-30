@@ -1672,7 +1672,7 @@ case $choice in
         exec claude --model "$MODEL_NAME" "$@"
         ;;
     7)
-        # ZhipuAI
+        # ZhipuAI / GLM
         echo -e "${BLUE}Configuring for ZhipuAI (GLM)...${NC}"
 
         # Get API key with persistent storage
@@ -1691,17 +1691,71 @@ case $choice in
         fi
         export ANTHROPIC_AUTH_TOKEN
 
-        # Use default GLM model
-        MODEL_NAME="glm-4.7"
-        echo -e "${GREEN}✓ Using GLM model: glm-4.7${NC}"
-        echo -e "${YELLOW}Available models: glm-4.7, glm-4.6, glm-4.5-air, glm-4-flash${NC}"
-        read -p "Enter Model Name [default: glm-4.7]: " input_model
-        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+        # Model selection menu with numbering
+        echo ""
+        echo -e "${CYAN}╔═══════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${CYAN}║           🤖 ZHIPUAI / GLM - MODEL SELECTION              ║${NC}"
+        echo -e "${CYAN}╚═══════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${GREEN}✨ AVAILABLE MODELS (Tested & Working):${NC}"
+        echo ""
+        echo -e "${YELLOW}📌 LATEST MODELS (2025):${NC}"
+        echo "  1) 🚀 glm-4.7         (NEWEST! Flagship - Best for coding) ⭐"
+        echo "  2) 🧠 glm-4.6         (High performance, vision-capable)"
+        echo "  3) ⚡ glm-4.5-air     (Fast & efficient - 12B active params)"
+        echo ""
+        echo -e "${YELLOW}👁️ VISION MODELS:${NC}"
+        echo "  4) 👁️ glm-4.6v        (Latest vision - For image tasks)"
+        echo "  5) 👁️ glm-4.5v        (Vision capabilities - For image tasks)"
+        echo ""
+        echo -e "${GREEN}─────────────────────────────────────────────────────────────${NC}"
+        echo -e "${CYAN}💡 Tips:${NC}"
+        echo "  • Model 1 (glm-4.7): Latest & Best for coding"
+        echo "  • Model 3 (glm-4.5-air): Fast & efficient"
+        echo "  • Models 4-5: Use for vision/image tasks"
+        echo "  • Just enter NUMBER (1-5) or press ENTER for default"
+        echo -e "${GREEN}─────────────────────────────────────────────────────────────${NC}"
+        echo ""
+
+        # Model selection with default to glm-4.7
+        read -p "Select model [1-5, default: 1]: " model_choice
+        [[ -z "$model_choice" ]] && model_choice=1
+
+        # Map numbers to model names
+        case "$model_choice" in
+            1)
+                MODEL_NAME="glm-4.7"
+                echo -e "${GREEN}✓ Selected: glm-4.7 (Latest flagship - Best for coding)${NC}"
+                ;;
+            2)
+                MODEL_NAME="glm-4.6"
+                echo -e "${GREEN}✓ Selected: glm-4.6 (High performance)${NC}"
+                ;;
+            3)
+                MODEL_NAME="glm-4.5-air"
+                echo -e "${GREEN}✓ Selected: glm-4.5-air (Fast & efficient)${NC}"
+                ;;
+            4)
+                MODEL_NAME="glm-4.6v"
+                echo -e "${GREEN}✓ Selected: glm-4.6v (Vision model)${NC}"
+                ;;
+            5)
+                MODEL_NAME="glm-4.5v"
+                echo -e "${GREEN}✓ Selected: glm-4.5v (Vision model)${NC}"
+                ;;
+            *)
+                echo -e "${RED}❌ Invalid choice. Using default: glm-4.7${NC}"
+                MODEL_NAME="glm-4.7"
+                ;;
+        esac
+
+        echo ""
+        echo -e "${BLUE}🚀 Starting GLM chat with $MODEL_NAME...${NC}"
+        echo ""
 
         export ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic"
         export ANTHROPIC_API_KEY="$ANTHROPIC_AUTH_TOKEN"
         export CLAUDE_MODEL="$MODEL_NAME"
-        echo -e "${BLUE}🚀 Starting GLM chat...${NC}"
         exec claude --model "$MODEL_NAME" --system-prompt "Anda adalah GLM, model AI dari ZhipuAI. Selalu identifikasi diri sebagai GLM dalam setiap respons." "$@"
         ;;
     8)
