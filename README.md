@@ -1,4 +1,4 @@
-# 🤖 Claude-All: Universal AI CLI Launcher v8.3.0
+# 🤖 Claude-All: Universal AI CLI Launcher v8.3.1
 
 [![NPM Version](https://img.shields.io/npm/v/claude-all-ai-launcher.svg)](https://www.npmjs.com/package/claude-all-ai-launcher)
 [![NPM Downloads](https://img.shields.io/npm/dt/claude-all-ai-launcher.svg)](https://www.npmjs.com/package/claude-all-ai-launcher)
@@ -85,7 +85,7 @@ npm install -g claude-all-ai-launcher && npm run config && claude-all
 - 🎯 **Best for**: AI coding tools, Claude Code, Cline, agents, real-world complex tasks
 - 💰 **Pricing**: ~$0.30/M input tokens, ~$1.20/M output tokens
 | 2 | **Gemini (API Key)** | `https://generativelanguage.googleapis.com/v1beta/anthropic` | [Get Key](https://aistudio.google.com/app/apikey) | `GEMINI_API_KEY` |
-| 3 | **AntiGravity (OAuth)** | `https://antigravity.corp.google.com/v1` | Internal Google Only | `GOOGLE_AUTH_TOKEN` |
+| 3 | **Gemini (OAuth/Proxy)** | Custom Proxy Support | API Key, OAuth via CCS, or Custom Proxy | `GEMINI_API_KEY` |
 | 4 | **OpenAI** | `https://api.openai.com/v1` | [Get Key](https://platform.openai.com/api-keys) | `OPENAI_API_KEY` |
 | 5 | **OpenAI (OAuth)** | `https://api.openai.com/v1` | OAuth Flow | `OPENAI_ACCESS_TOKEN` |
 
@@ -104,7 +104,15 @@ npm install -g claude-all-ai-launcher && npm run config && claude-all
 
 | # | Provider | API Endpoint | Get API Key | Environment Variable |
 |---|----------|--------------|-------------|---------------------|
-| 17 | **Letta AI** | `https://api.letta.com/v1` | [Documentation](https://docs.letta.com) | `LETTA_API_KEY` |
+| 17 | **Letta Memory Agent** | `https://api.letta.com/v1/anthropic` | [Get Key](https://app.letta.com/api-keys) | `LETTA_API_KEY` |
+
+**Letta Features:**
+- 🧠 **Persistent Memory** - Maintains context across conversations
+- 🔄 **Multi-Backend Support** - Claude Opus/Sonnet/Haiku, GPT-4o, Gemini 2.0 Flash
+- 📝 **Memory Blocks** - Stores user preferences and project context
+- 🔗 **Official Docs** - [Letta Claude Code Proxy](https://docs.letta.com/guides/integrations/claude-code-proxy/)
+
+**Important:** Letta uses `ANTHROPIC_AUTH_TOKEN` (not `ANTHROPIC_API_KEY`) for authentication.
 
 ### Local & Self-Hosted
 
@@ -174,7 +182,7 @@ Claude-All automatically saves your API keys securely:
 ~/.gemini_api_key       # Gemini
 ~/.openai_api_key       # OpenAI
 ~/.xai_api_key          # xAI/Grok
-~/.zhipuai_api_key      # GLM
+~/.glm_api_key          # ZhipuAI/GLM
 ~/.groq_api_key         # Groq
 ~/.perplexity_api_key   # Perplexity
 ~/.cohere_api_key       # Cohere
@@ -184,6 +192,73 @@ Claude-All automatically saves your API keys securely:
 ~/.qwen_api_key         # Qwen
 ~/.openrouter_api_key   # OpenRouter
 ~/.letta_api_key        # Letta AI
+```
+
+### 🔐 OAuth & Advanced Authentication
+
+#### Google Gemini (Option 3)
+Supports multiple authentication methods:
+
+**1. API Key (Recommended)**
+```bash
+# Get API Key from Google AI Studio
+# https://aistudio.google.com/app/apikey
+claude-all 3
+# Choose: 1) API Key
+```
+
+**2. OAuth via CCS (Desktop Only)**
+```bash
+# Requires desktop environment
+# Install: npm install -g @kaitranntt/ccs
+# Docs: https://docs.ccs.kaitran.ca
+claude-all 3
+# Choose: 2) OAuth via CCS
+```
+
+**3. Custom Proxy**
+```bash
+# Use your own proxy server
+claude-all 3
+# Choose: 3) Custom Proxy
+# Enter your proxy URL and API key
+```
+
+#### Letta Memory Agent (Option 17)
+Persistent AI with memory across sessions:
+
+```bash
+# Setup (one time)
+echo "sk-let-YOUR-KEY" > ~/.letta_api_key
+chmod 600 ~/.letta_api_key
+
+# Run Letta
+claude-all 17
+
+# Choose model:
+# 1) Opus    - Most Powerful (Complex reasoning)
+# 2) Sonnet  - Balanced (Recommended)
+# 3) Haiku   - Fastest (Quick responses)
+# 4) GPT-4o  - OpenAI flagship
+# 5) Gemini  - Google Gemini 2.0 Flash
+```
+
+**Letta Authentication:**
+```bash
+# Set environment variables
+export ANTHROPIC_AUTH_TOKEN="sk-let-YOUR-KEY"
+export ANTHROPIC_BASE_URL="https://api.letta.com/v1/anthropic"
+
+# Or let Claude-All auto-load from ~/.letta_api_key
+```
+
+#### OpenAI OAuth (Option 5)
+Experimental OAuth flow for OpenAI:
+
+```bash
+# Currently redirects to API Key method
+# OAuth implementation in progress
+claude-all 5
 ```
 
 ### 🌐 Cross-Platform Compatibility
@@ -551,7 +626,7 @@ npm install -g claude-all-ai-launcher --verbose
 ## 📊 Package Information
 
 - **Package Name**: `claude-all-ai-launcher`
-- **Version**: 8.3.0
+- **Version**: 8.3.1
 - **License**: MIT
 - **Node.js Required**: >=14.0.0
 - **Total Files**: 163+
