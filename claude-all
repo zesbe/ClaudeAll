@@ -916,7 +916,7 @@ if [[ -z "$choice" ]]; then
     echo -e "${YELLOW}📱 MAIN MODELS:${NC}"
     echo "  1) MiniMax (Direct Anthropic API)     🚀 Fast & Reliable"
     echo "  2) Google Gemini (API Key - AI Studio)  🧠 Google AI"
-    echo "  3) Google AntiGravity (OAuth)             ⚡ Internal Google"
+    echo "  3) Universal OAuth (CCS)             🔥 37+ Models (GPT-5, Claude, Gemini)"
     echo "  4) OpenAI (API Key)                     🤖 GPT Models"
     echo "  5) OpenAI (OAuth - Experimental)          🔄 Auto-auth"
     echo ""
@@ -930,7 +930,7 @@ if [[ -z "$choice" ]]; then
     echo ""
     echo -e "${YELLOW}🏠 LOCAL & SPECIALIZED:${NC}"
     echo " 12) Ollama (Local Models)                💻 Self-hosted"
-    echo " 13) Mistral (API Key)                    🇫🇷 European AI"
+    echo " 13) Mistral (API Key)                    🇫🇷 European AI (15 Models)"
     echo " 14) Moonshot (API Key)                   🌙 Kawaii AI"
     echo " 15) Qwen (API Key)                       🇨🇳 Alibaba"
     echo " 16) OpenRouter (Multi-provider)           🔀 All-in-one"
@@ -1465,70 +1465,196 @@ case $choice in
         exec claude --dangerously-skip-permissions --model "$CLAUDE_MODEL" --system-prompt "Anda adalah Gemini, model AI dari Google. Selalu identifikasi diri sebagai Gemini dalam setiap respons." "$@"
         ;;
     3)
-        # Google Gemini OAuth / Proxy
-        echo -e "${BLUE}🌟 Google Gemini (OAuth/Proxy)${NC}"
+        # Universal OAuth - All Providers via CCS
+        echo -e "${BLUE}🔥 Universal OAuth (Zero-Config - All Models FREE)${NC}"
         echo ""
-        echo "Pilih metode autentikasi:"
-        echo "  1) API Key (Recommended)     - Pakai Gemini API Key"
-        echo "  2) OAuth via CCS             - Pakai CCS proxy (Desktop only)"
-        echo "  3) Custom Proxy              - Pakai proxy server sendiri"
+        echo -e "${YELLOW}Pilih Provider:${NC}"
+        echo "  1) Gemini (Google)           🧠 Google AI Models (8 Models)"
+        echo "  2) Codex (OpenAI)            🤖 GPT 5.2, 5.1, 5 (18 Models)"
+        echo "  3) GitHub Copilot           💻 Claude & GPT Models"
+        echo "  4) AntiGravity (Anthropic)  🔥 Claude Opus 4.5 (6 Models)"
+        echo "  5) Kiro (AWS)                ☁️  AWS Claude Models"
         echo ""
-        read -p "Pilih [1-3, default: 1]: " auth_method
-        [[ -z "$auth_method" ]] && auth_method=1
+        read -p "Pilih [1-5, default: 1]: " oauth_provider
+        [[ -z "$oauth_provider" ]] && oauth_provider=1
 
-        case $auth_method in
+        case $oauth_provider in
             1)
-                # API Key method - redirect to option 2
-                echo -e "${YELLOW}Menggunakan Gemini API Key...${NC}"
-                echo -e "${CYAN}Tip: Dapatkan API key di https://aistudio.google.com/app/apikey${NC}"
-                
-                if [[ -z "$GEMINI_API_KEY" ]]; then
-                    if [[ -f "$HOME/.gemini_api_key" ]]; then
-                        GEMINI_API_KEY=$(cat "$HOME/.gemini_api_key")
-                        echo -e "${GREEN}✓ API key loaded dari ~/.gemini_api_key${NC}"
-                    else
-                        read -s -p "Enter Gemini API Key: " GEMINI_API_KEY
-                        echo ""
-                        echo "$GEMINI_API_KEY" > "$HOME/.gemini_api_key"
-                        chmod 600 "$HOME/.gemini_api_key"
-                        echo -e "${GREEN}✓ API key disimpan${NC}"
-                    fi
-                fi
-                
-                export ANTHROPIC_BASE_URL="https://generativelanguage.googleapis.com/v1beta/anthropic"
-                export ANTHROPIC_API_KEY="$GEMINI_API_KEY"
-                
-                echo -e "${BLUE}🚀 Starting Gemini...${NC}"
-                exec claude --dangerously-skip-permissions --no-chrome --model "gemini-2.0-flash-exp" "$@"
+                # Gemini OAuth
+                echo -e "${BLUE}🌟 Google Gemini via CCS OAuth${NC}"
+                echo ""
+                echo -e "${YELLOW}Pilih Model:${NC}"
+                echo "  1) gemini-2.5-pro           (Stable - Most Capable) [RECOMMENDED]"
+                echo "  2) gemini-2.5-flash         (Stable - Fast & Efficient)"
+                echo "  3) gemini-2.5-flash-lite    (Stable - Ultra Fast)"
+                echo "  4) gemini-3-pro-preview     (Next Gen - Most Capable) 🔥"
+                echo "  5) gemini-3-flash-preview   (Next Gen - Fast) 🚀"
+                echo "  6) gemini-2.0-flash-exp     (Experimental)"
+                echo "  7) gemini-1.5-pro           (Stable - Older)"
+                echo "  8) gemini-1.5-flash         (Stable - Fast)"
+                echo ""
+                read -p "Pilih [1-8, default: 1]: " gemini_model
+                [[ -z "$gemini_model" ]] && gemini_model=1
+
+                case $gemini_model in
+                    1) MODEL="gemini-2.5-pro" ;;
+                    2) MODEL="gemini-2.5-flash" ;;
+                    3) MODEL="gemini-2.5-flash-lite" ;;
+                    4) MODEL="gemini-3-pro-preview" ;;
+                    5) MODEL="gemini-3-flash-preview" ;;
+                    6) MODEL="gemini-2.0-flash-exp" ;;
+                    7) MODEL="gemini-1.5-pro" ;;
+                    8) MODEL="gemini-1.5-flash" ;;
+                    *) MODEL="gemini-2.5-pro" ;;
+                esac
+
+                echo -e "${GREEN}✓ Model: $MODEL${NC}"
+                echo -e "${YELLOW}Pastikan sudah login dengan 'ccs gemini --auth'${NC}"
+                echo ""
+
+                export ANTHROPIC_MODEL="$MODEL"
+                exec ccs gemini --model "$MODEL" "$@"
                 ;;
             2)
-                # CCS OAuth method
-                echo -e "${YELLOW}CCS OAuth membutuhkan:${NC}"
-                echo "  - Desktop environment (tidak support Termux)"
-                echo "  - Install: npm install -g @kaitranntt/ccs"
-                echo "  - Docs: https://docs.ccs.kaitran.ca"
+                # Codex (OpenAI) OAuth
+                echo -e "${BLUE}🤖 Codex (OpenAI via CCS OAuth)${NC}"
                 echo ""
-                echo -e "${CYAN}Untuk Termux, gunakan option 1 (API Key)${NC}"
+                echo -e "${YELLOW}Pilih Model:${NC}"
+                echo -e "${CYAN}GPT 5.2 Series (Latest 🔥):${NC}"
+                echo "  1)  gpt-5.2                  (Flagship - Best for Coding) [RECOMMENDED]"
+                echo "  2)  gpt-5.2-pro              (Smarter & More Precise)"
+                echo "  3)  gpt-5.2-chat-latest      (ChatGPT Version)"
                 echo ""
-                read -p "Press Enter untuk kembali..."
-                exec "$0"
+                echo -e "${CYAN}GPT 5.1 Series:${NC}"
+                echo "  4)  gpt-5.1-codex-max        (Most Intelligent Coding)"
+                echo "  5)  gpt-5.1-codex            (Agentic Coding Optimized)"
+                echo "  6)  gpt-5.1                  (Configurable Reasoning)"
+                echo "  7)  gpt-5.1-codex-mini       (Cost-Efficient)"
+                echo "  8)  gpt-5.1-chat-latest      (ChatGPT Version)"
+                echo ""
+                echo -e "${CYAN}GPT 5 Series:${NC}"
+                echo "  9)  gpt-5                    (Previous Reasoning Model)"
+                echo "  10) gpt-5-pro                (Smarter Version)"
+                echo "  11) gpt-5-codex              (Agentic Coding)"
+                echo "  12) gpt-5-chat-latest        (ChatGPT Version)"
+                echo ""
+                echo -e "${CYAN}Legacy (GPT 4 Series):${NC}"
+                echo "  13) gpt-4o                   (GPT-4 Omni)"
+                echo "  14) gpt-4o-mini              (Fast & Efficient)"
+                echo "  15) gpt-4-turbo              (GPT-4 Turbo)"
+                echo "  16) o1-preview               (Reasoning Model)"
+                echo "  17) o1-mini                  (Fast Reasoning)"
+                echo "  18) o1-pro                   (Advanced Reasoning)"
+                echo ""
+                read -p "Pilih [1-18, default: 1]: " codex_model
+                [[ -z "$codex_model" ]] && codex_model=1
+
+                case $codex_model in
+                    1) MODEL="gpt-5.2" ;;
+                    2) MODEL="gpt-5.2-pro" ;;
+                    3) MODEL="gpt-5.2-chat-latest" ;;
+                    4) MODEL="gpt-5.1-codex-max" ;;
+                    5) MODEL="gpt-5.1-codex" ;;
+                    6) MODEL="gpt-5.1" ;;
+                    7) MODEL="gpt-5.1-codex-mini" ;;
+                    8) MODEL="gpt-5.1-chat-latest" ;;
+                    9) MODEL="gpt-5" ;;
+                    10) MODEL="gpt-5-pro" ;;
+                    11) MODEL="gpt-5-codex" ;;
+                    12) MODEL="gpt-5-chat-latest" ;;
+                    13) MODEL="gpt-4o" ;;
+                    14) MODEL="gpt-4o-mini" ;;
+                    15) MODEL="gpt-4-turbo" ;;
+                    16) MODEL="o1-preview" ;;
+                    17) MODEL="o1-mini" ;;
+                    18) MODEL="o1-pro" ;;
+                    *) MODEL="gpt-5.2" ;;
+                esac
+
+                echo -e "${GREEN}✓ Model: $MODEL${NC}"
+                echo -e "${YELLOW}Pastikan sudah login dengan 'ccs codex --auth'${NC}"
+                echo ""
+
+                export ANTHROPIC_MODEL="$MODEL"
+                exec ccs codex --model "$MODEL" "$@"
                 ;;
             3)
-                # Custom proxy
+                # GitHub Copilot OAuth
+                echo -e "${BLUE}💻 GitHub Copilot (OAuth)${NC}"
                 echo ""
-                read -p "Enter Proxy Base URL: " PROXY_URL
-                read -p "Enter API Key (atau kosong): " PROXY_KEY
-                [[ -z "$PROXY_KEY" ]] && PROXY_KEY="proxy"
-                
-                export ANTHROPIC_BASE_URL="$PROXY_URL"
-                export ANTHROPIC_API_KEY="$PROXY_KEY"
-                
-                echo -e "${BLUE}🚀 Starting dengan custom proxy...${NC}"
-                exec claude --dangerously-skip-permissions --no-chrome "$@"
+                echo -e "${YELLOW}Pilih Model:${NC}"
+                echo "  1) claude-opus-4.5           (Most Capable) [RECOMMENDED]"
+                echo "  2) claude-sonnet-4.5         (Balanced)"
+                echo "  3) gpt-4o                   (GPT-4 Omni)"
+                echo "  4) gpt-5.1                  (Latest ChatGPT)"
+                echo ""
+                read -p "Pilih [1-4, default: 1]: " copilot_model
+                [[ -z "$copilot_model" ]] && copilot_model=1
+
+                case $copilot_model in
+                    1) MODEL="claude-opus-4.5" ;;
+                    2) MODEL="claude-sonnet-4.5" ;;
+                    3) MODEL="gpt-4o" ;;
+                    4) MODEL="gpt-5.1" ;;
+                    *) MODEL="claude-opus-4.5" ;;
+                esac
+
+                echo -e "${GREEN}✓ Model: $MODEL${NC}"
+                echo -e "${CYAN}Requires: npm install -g copilot-api${NC}"
+                echo ""
+
+                if command -v copilot-api &> /dev/null; then
+                    export ANTHROPIC_MODEL="$MODEL"
+                    exec ccs copilot --model "$MODEL" "$@"
+                else
+                    echo -e "${RED}copilot-api not found!${NC}"
+                    echo "Install dengan: npm install -g copilot-api"
+                    echo "Kemudian jalankan: ccs copilot auth"
+                    echo ""
+                    read -p "Press Enter untuk kembali..."
+                    exec "$0"
+                fi
                 ;;
-            *)
-                echo "Kembali ke menu..."
-                exec "$0"
+            4)
+                # AntiGravity (Anthropic) OAuth
+                echo -e "${BLUE}🔥 AntiGravity (Anthropic via CCS OAuth)${NC}"
+                echo ""
+                echo -e "${YELLOW}Pilih Model:${NC}"
+                echo "  1) gemini-claude-opus-4-5-thinking  (Most Capable - Thinking) [RECOMMENDED]"
+                echo "  2) gemini-3-flash-preview          (Next Gen - Fast)"
+                echo "  3) gemini-2.5-pro                  (Stable - Capable)"
+                echo "  4) gemini-2.5-flash                (Stable - Fast)"
+                echo "  5) claude-opus-4.2                 (Stable - Previous)"
+                echo "  6) claude-sonnet-4.2               (Stable - Balanced)"
+                echo ""
+                read -p "Pilih [1-6, default: 1]: " agy_model
+                [[ -z "$agy_model" ]] && agy_model=1
+
+                case $agy_model in
+                    1) MODEL="gemini-claude-opus-4-5-thinking" ;;
+                    2) MODEL="gemini-3-flash-preview" ;;
+                    3) MODEL="gemini-2.5-pro" ;;
+                    4) MODEL="gemini-2.5-flash" ;;
+                    5) MODEL="claude-opus-4.2" ;;
+                    6) MODEL="claude-sonnet-4.2" ;;
+                    *) MODEL="gemini-claude-opus-4-5-thinking" ;;
+                esac
+
+                echo -e "${GREEN}✓ Model: $MODEL${NC}"
+                echo -e "${YELLOW}Pastikan sudah login dengan 'ccs agy --auth'${NC}"
+                echo ""
+
+                export ANTHROPIC_MODEL="$MODEL"
+                exec ccs agy --model "$MODEL" "$@"
+                ;;
+            5)
+                # Kiro (AWS) OAuth
+                echo -e "${BLUE}☁️  Kiro (AWS CodeWhisperer via CCS OAuth)${NC}"
+                echo ""
+                echo -e "${YELLOW}Model: AWS-hosted Claude models${NC}"
+                echo -e "${CYAN}Pastikan sudah login dengan 'ccs kiro --auth'${NC}"
+                echo ""
+                exec ccs kiro "$@"
                 ;;
         esac
         ;;
@@ -1923,8 +2049,57 @@ EOF
         exec claude --no-chrome --model "$MODEL_NAME" "$@"
         ;;
     13)
-        # Mistral
-        echo -e "${BLUE}Configuring for Mistral...${NC}"
+        # Mistral with 15 Models (2025)
+        echo -e "${BLUE}🇫🇷 Mistral AI (European AI)${NC}"
+        echo ""
+        echo -e "${YELLOW}Pilih Model:${NC}"
+        echo -e "${CYAN}🌟 Featured Models (Latest & Greatest):${NC}"
+        echo "  1)  mistral-large-latest      (Mistral Large 3 - State-of-the-art) [RECOMMENDED]"
+        echo "  2)  devstral-2                (Frontier Code Agents - Open)"
+        echo "  3)  mistral-medium-3.1        (Frontier Multimodal - Premier)"
+        echo ""
+        echo -e "${CYAN}🔥 Frontier Generalist:${NC}"
+        echo "  4)  mistral-small-latest      (Mistral Small 3.2 - Open)"
+        echo "  5)  ministral-3-latest       (Ministral 3 14B - Best Text & Vision)"
+        echo "  6)  ministral-3-8b            (Efficient - Open)"
+        echo "  7)  ministral-3-3b            (Tiny - Open)"
+        echo "  8)  magistral-medium-latest   (Reasoning - Premier)"
+        echo "  9)  magistral-small-latest    (Small Reasoning - Open)"
+        echo ""
+        echo -e "${CYAN}💻 Coding Models:${NC}"
+        echo " 10) codestral-latest          (Cutting-edge Code - Premier)"
+        echo " 11) devstral-small-2          (Code Agents - Labs)"
+        echo " 12) devstral-medium-1.0       (Enterprise SWE - Premier)"
+        echo ""
+        echo -e "${CYAN}🎨 Specialist Models:${NC}"
+        echo " 13) mistral-small-creative    (Creative Writing - Labs)"
+        echo " 14) ocr-3                    (Document AI - Premier)"
+        echo " 15) voxtral-mini              (Audio - Open)"
+        echo ""
+        read -p "Pilih [1-15, default: 1]: " mistral_model
+        [[ -z "$mistral_model" ]] && mistral_model=1
+
+        case $mistral_model in
+            1) MODEL="mistral-large-latest" ;;
+            2) MODEL="devstral-2" ;;
+            3) MODEL="mistral-medium-3.1" ;;
+            4) MODEL="mistral-small-latest" ;;
+            5) MODEL="ministral-3-latest" ;;
+            6) MODEL="ministral-3-8b" ;;
+            7) MODEL="ministral-3-3b" ;;
+            8) MODEL="magistral-medium-latest" ;;
+            9) MODEL="magistral-small-latest" ;;
+            10) MODEL="codestral-latest" ;;
+            11) MODEL="devstral-small-2" ;;
+            12) MODEL="devstral-medium-1.0" ;;
+            13) MODEL="mistral-small-creative" ;;
+            14) MODEL="ocr-3" ;;
+            15) MODEL="voxtral-mini" ;;
+            *) MODEL="mistral-large-latest" ;;
+        esac
+
+        echo -e "${GREEN}✓ Model: $MODEL${NC}"
+        echo ""
 
         # Get API key with persistent storage
         if [[ -z "$MISTRAL_API_KEY" ]]; then
@@ -1942,17 +2117,10 @@ EOF
         fi
         export MISTRAL_API_KEY
 
-        # Use default Mistral model
-        MODEL_NAME="mistral-large-latest"
-        echo -e "${GREEN}✓ Using Mistral model: mistral-large-latest${NC}"
-        echo -e "${YELLOW}Available models: mistral-small, mistral-medium, mistral-large, codestral${NC}"
-        read -p "Enter Model Name [default: mistral-large-latest]: " input_model
-        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
-
         export ANTHROPIC_BASE_URL="https://api.mistral.ai/v1/"
         export ANTHROPIC_API_KEY="$MISTRAL_API_KEY"
         echo -e "${BLUE}🚀 Starting Mistral chat...${NC}"
-        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
+        exec claude --dangerously-skip-permissions --model "$MODEL" "$@"
         ;;
     14)
         # Moonshot
