@@ -1,4 +1,4 @@
-# 🤖 Claude-All: Universal AI CLI Launcher v8.4.0
+# 🤖 Claude-All: Universal AI CLI Launcher v8.4.1
 
 [![NPM Version](https://img.shields.io/npm/v/claude-all-ai-launcher.svg)](https://www.npmjs.com/package/claude-all-ai-launcher)
 [![NPM Downloads](https://img.shields.io/npm/dt/claude-all-ai-launcher.svg)](https://www.npmjs.com/package/claude-all-ai-launcher)
@@ -196,32 +196,53 @@ Claude-All automatically saves your API keys securely:
 
 ### 🔐 OAuth & Advanced Authentication
 
-#### Google Gemini (Option 3)
-Supports multiple authentication methods:
+#### Universal OAuth (Option 3) - Auto-Setup! 🚀
 
-**1. API Key (Recommended)**
+**NEW: Zero-Config Setup!** ClaudeAll will automatically install CCS if needed.
+
+**Features:**
+- ✅ **Auto-Installer**: CCS installed automatically (~10MB, 30 seconds)
+- ✅ **37+ Models**: GPT-5.2, Claude Opus 4.5, Gemini 3, etc
+- ✅ **5 Providers**: Gemini, Codex, GitHub Copilot, AntiGravity, Kiro AWS
+- ✅ **One-Click Setup**: No manual installation needed!
+
+**Usage:**
 ```bash
-# Get API Key from Google AI Studio
-# https://aistudio.google.com/app/apikey
+# Just run option 3!
 claude-all 3
-# Choose: 1) API Key
+
+# First time:
+# 1. ClaudeAll checks if CCS is installed
+# 2. If not, offers to install automatically
+# 3. After install, guides you to authenticate
+# 4. Done! Start using 37+ OAuth models
+
+# Choose Provider:
+# 1) Gemini (8 models)
+# 2) Codex/OpenAI (18 models - GPT-5.2!)
+# 3) GitHub Copilot (4 models - Claude Opus 4.5!)
+# 4) AntiGravity (6 models)
+# 5) Kiro AWS
 ```
 
-**2. OAuth via CCS (Desktop Only)**
-```bash
-# Requires desktop environment
-# Install: npm install -g @kaitranntt/ccs
-# Docs: https://docs.ccs.kaitran.ca
-claude-all 3
-# Choose: 2) OAuth via CCS
-```
+**Supported Models:**
+- **Gemini**: gemini-2.5-pro, gemini-3-pro-preview, etc (8 models)
+- **Codex**: gpt-5.2, gpt-5.1-codex-max, o1-preview, etc (18 models)
+- **GitHub Copilot**: claude-opus-4.5, gpt-5.1, etc (4 models)
+- **AntiGravity**: gemini-claude-opus-4-5-thinking, etc (6 models)
+- **Kiro AWS**: AWS-hosted Claude models
 
-**3. Custom Proxy**
+**Manual CCS Install (Optional):**
 ```bash
-# Use your own proxy server
-claude-all 3
-# Choose: 3) Custom Proxy
-# Enter your proxy URL and API key
+# If you prefer manual installation:
+npm install -g @kaitranntt/ccs
+
+# Then authenticate:
+ccs gemini --auth   # For Gemini
+ccs codex --auth    # For OpenAI/Codex
+ccs copilot --auth  # For GitHub Copilot
+ccs agy --auth      # For AntiGravity
+ccs kiro --auth     # For AWS Kiro
 ```
 
 #### Letta Memory Agent (Option 17)
@@ -626,7 +647,7 @@ npm install -g claude-all-ai-launcher --verbose
 ## 📊 Package Information
 
 - **Package Name**: `claude-all-ai-launcher`
-- **Version**: 8.4.0
+- **Version**: 8.4.1
 - **License**: MIT
 - **Node.js Required**: >=14.0.0
 - **Total Files**: 163+

@@ -916,7 +916,7 @@ if [[ -z "$choice" ]]; then
     echo -e "${YELLOW}📱 MAIN MODELS:${NC}"
     echo "  1) MiniMax (Direct Anthropic API)     🚀 Fast & Reliable"
     echo "  2) Google Gemini (API Key - AI Studio)  🧠 Google AI"
-    echo "  3) Universal OAuth (CCS)             🔥 37+ Models (GPT-5, Claude, Gemini)"
+    echo "  3) Universal OAuth (Auto-Setup)      🔥 37+ Models (GPT-5, Claude, Gemini)"
     echo "  4) OpenAI (API Key)                     🤖 GPT Models"
     echo "  5) OpenAI (OAuth - Experimental)          🔄 Auto-auth"
     echo ""
@@ -990,6 +990,85 @@ save_api_key() {
     echo "$key" > "$key_file"
     chmod 600 "$key_file"
     echo -e "${GREEN}✓ $provider_name API key saved to $key_file${NC}"
+}
+
+# Check and install CCS if needed
+check_and_install_ccs() {
+    local provider_name="$1"
+    
+    # Check if CCS is installed
+    if command -v ccs &> /dev/null; then
+        echo -e "${GREEN}✓ CCS sudah terinstall${NC}"
+        return 0
+    fi
+    
+    echo -e "${YELLOW}⚠️  CCS (Claude Code Switch) belum terinstall${NC}"
+    echo ""
+    echo -e "${CYAN}CCS diperlukan untuk Universal OAuth (GPT-5, Claude Opus 4.5, Gemini 3)${NC}"
+    echo ""
+    echo "Install CCS akan:"
+    echo "  • Download @kaitranntt/ccs via npm"
+    echo "  • Ukuran: ~10MB"
+    echo "  • Waktu: ~30 detik"
+    echo ""
+    read -p "Install CCS sekarang? [Y/n]: " install_ccs
+    
+    if [[ "$install_ccs" =~ ^[Nn] ]]; then
+        echo -e "${RED}✗ CCS tidak diinstall. Kembali ke menu...${NC}"
+        sleep 1
+        exec "$0"
+    fi
+    
+    echo ""
+    echo -e "${BLUE}📦 Installing CCS...${NC}"
+    
+    # Install CCS via npm
+    if npm install -g @kaitranntt/ccs; then
+        echo ""
+        echo -e "${GREEN}✓ CCS berhasil diinstall!${NC}"
+        echo ""
+        
+        # Verify installation
+        if command -v ccs &> /dev/null; then
+            echo -e "${GREEN}✓ CCS version: $(ccs --version 2>&1 | head -1)${NC}"
+            echo ""
+            echo -e "${CYAN}Selanjutnya Anda perlu authenticate untuk $provider_name:${NC}"
+            echo -e "${YELLOW}Command: ccs ${provider_name,,} --auth${NC}"
+            echo ""
+            read -p "Authenticate sekarang? [Y/n]: " do_auth
+            
+            if [[ ! "$do_auth" =~ ^[Nn] ]]; then
+                echo ""
+                echo -e "${BLUE}🔐 Membuka browser untuk authentication...${NC}"
+                ccs "${provider_name,,}" --auth
+                echo ""
+                echo -e "${GREEN}✓ Authentication selesai!${NC}"
+                echo ""
+                read -p "Press Enter untuk melanjutkan..."
+            else
+                echo ""
+                echo -e "${YELLOW}⚠️  Jangan lupa authenticate nanti dengan: ccs ${provider_name,,} --auth${NC}"
+                echo ""
+                read -p "Press Enter untuk kembali ke menu..."
+                exec "$0"
+            fi
+        else
+            echo -e "${RED}✗ CCS install failed. Coba lagi dengan: npm install -g @kaitranntt/ccs${NC}"
+            read -p "Press Enter untuk kembali..."
+            exec "$0"
+        fi
+    else
+        echo ""
+        echo -e "${RED}✗ CCS install gagal!${NC}"
+        echo ""
+        echo "Troubleshooting:"
+        echo "  1. Check internet connection"
+        echo "  2. Try: npm cache clean --force"
+        echo "  3. Manual install: npm install -g @kaitranntt/ccs"
+        echo ""
+        read -p "Press Enter untuk kembali..."
+        exec "$0"
+    fi
 }
 
 load_api_key_to_var() {
@@ -1466,7 +1545,9 @@ case $choice in
         ;;
     3)
         # Universal OAuth - All Providers via CCS
-        echo -e "${BLUE}🔥 Universal OAuth (Zero-Config - All Models FREE)${NC}"
+        echo -e "${BLUE}🔥 Universal OAuth (Auto-Setup - All Models FREE)${NC}"
+        echo ""
+        echo -e "${CYAN}💡 CCS akan di-install otomatis jika belum ada (10MB, ~30 detik)${NC}"
         echo ""
         echo -e "${YELLOW}Pilih Provider:${NC}"
         echo "  1) Gemini (Google)           🧠 Google AI Models (8 Models)"
@@ -1481,6 +1562,8 @@ case $choice in
         case $oauth_provider in
             1)
                 # Gemini OAuth
+                check_and_install_ccs "gemini"
+                
                 echo -e "${BLUE}🌟 Google Gemini via CCS OAuth${NC}"
                 echo ""
                 echo -e "${YELLOW}Pilih Model:${NC}"
@@ -1517,6 +1600,8 @@ case $choice in
                 ;;
             2)
                 # Codex (OpenAI) OAuth
+                check_and_install_ccs "codex"
+                
                 echo -e "${BLUE}🤖 Codex (OpenAI via CCS OAuth)${NC}"
                 echo ""
                 echo -e "${YELLOW}Pilih Model:${NC}"
@@ -1580,6 +1665,8 @@ case $choice in
                 ;;
             3)
                 # GitHub Copilot OAuth
+                check_and_install_ccs "copilot"
+                
                 echo -e "${BLUE}💻 GitHub Copilot (OAuth)${NC}"
                 echo ""
                 echo -e "${YELLOW}Pilih Model:${NC}"
@@ -1617,6 +1704,8 @@ case $choice in
                 ;;
             4)
                 # AntiGravity (Anthropic) OAuth
+                check_and_install_ccs "agy"
+                
                 echo -e "${BLUE}🔥 AntiGravity (Anthropic via CCS OAuth)${NC}"
                 echo ""
                 echo -e "${YELLOW}Pilih Model:${NC}"
@@ -1649,6 +1738,8 @@ case $choice in
                 ;;
             5)
                 # Kiro (AWS) OAuth
+                check_and_install_ccs "kiro"
+                
                 echo -e "${BLUE}☁️  Kiro (AWS CodeWhisperer via CCS OAuth)${NC}"
                 echo ""
                 echo -e "${YELLOW}Model: AWS-hosted Claude models${NC}"
