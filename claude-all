@@ -992,14 +992,16 @@ save_api_key() {
     echo -e "${GREEN}✓ $provider_name API key saved to $key_file${NC}"
 }
 
-load_api_key() {
+load_api_key_to_var() {
     local key_file="$1"
     local var_name="$2"
 
     if [[ -f "$key_file" ]]; then
         local key=$(cat "$key_file" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         if [[ -n "$key" ]]; then
-            export "$var_name=$key"
+            # Use eval to ensure variable is set in current scope
+            eval "$var_name='$key'"
+            export "$var_name"
             return 0
         fi
     fi
@@ -1015,7 +1017,7 @@ get_api_key_with_save() {
     # Try to load from environment first
     if [[ -z "${!var_name}" ]]; then
         # Try to load from file
-        load_api_key "$key_file" "$var_name"
+        load_api_key_to_var "$key_file" "$var_name"
     fi
 
     # Still empty? Ask user
@@ -1375,7 +1377,7 @@ case $choice in
         # Get API key with persistent storage
         if [[ -z "$GEMINI_API_KEY" ]]; then
             # Try to load from file
-            load_api_key "$HOME/.gemini_api_key" "GEMINI_API_KEY"
+            load_api_key_to_var "$HOME/.gemini_api_key" "GEMINI_API_KEY"
         fi
 
         if [[ -z "$GEMINI_API_KEY" ]]; then
@@ -1536,7 +1538,7 @@ case $choice in
 
         # Get API key with persistent storage
         if [[ -z "$OPENAI_API_KEY" ]]; then
-            load_api_key "$HOME/.openai_api_key" "OPENAI_API_KEY"
+            load_api_key_to_var "$HOME/.openai_api_key" "OPENAI_API_KEY"
         fi
 
         if [[ -z "$OPENAI_API_KEY" ]]; then
@@ -1611,7 +1613,7 @@ case $choice in
 
         # Fallback to API Key mode for simplicity
         if [[ -z "$OPENAI_API_KEY" ]]; then
-            load_api_key "$HOME/.openai_api_key" "OPENAI_API_KEY"
+            load_api_key_to_var "$HOME/.openai_api_key" "OPENAI_API_KEY"
         fi
 
         if [[ -z "$OPENAI_API_KEY" ]]; then
@@ -1645,7 +1647,7 @@ case $choice in
 
         # Get API key with persistent storage
         if [[ -z "$XAI_API_KEY" ]]; then
-            load_api_key "$HOME/.xai_api_key" "XAI_API_KEY"
+            load_api_key_to_var "$HOME/.xai_api_key" "XAI_API_KEY"
         fi
 
         if [[ -z "$XAI_API_KEY" ]]; then
@@ -1677,7 +1679,7 @@ case $choice in
 
         # Get API key with persistent storage
         if [[ -z "$ANTHROPIC_AUTH_TOKEN" ]]; then
-            load_api_key "$HOME/.glm_api_key" "ANTHROPIC_AUTH_TOKEN"
+            load_api_key_to_var "$HOME/.glm_api_key" "ANTHROPIC_AUTH_TOKEN"
         fi
 
         if [[ -z "$ANTHROPIC_AUTH_TOKEN" ]]; then
@@ -1764,7 +1766,7 @@ case $choice in
 
         # Get API key with persistent storage
         if [[ -z "$GROQ_API_KEY" ]]; then
-            load_api_key "$HOME/.groq_api_key" "GROQ_API_KEY"
+            load_api_key_to_var "$HOME/.groq_api_key" "GROQ_API_KEY"
         fi
 
         if [[ -z "$GROQ_API_KEY" ]]; then
@@ -1797,7 +1799,7 @@ case $choice in
         # Get API key with persistent storage
         if [[ -z "$PERPLEXITY_API_KEY" ]]; then
             # Try to load from file
-            load_api_key "$HOME/.perplexity_api_key" "PERPLEXITY_API_KEY"
+            load_api_key_to_var "$HOME/.perplexity_api_key" "PERPLEXITY_API_KEY"
         fi
 
         if [[ -z "$PERPLEXITY_API_KEY" ]]; then
@@ -1840,7 +1842,7 @@ EOF
 
         # Get API key with persistent storage
         if [[ -z "$COHERE_API_KEY" ]]; then
-            load_api_key "$HOME/.cohere_api_key" "COHERE_API_KEY"
+            load_api_key_to_var "$HOME/.cohere_api_key" "COHERE_API_KEY"
         fi
 
         if [[ -z "$COHERE_API_KEY" ]]; then
@@ -1872,7 +1874,7 @@ EOF
 
         # Get API key with persistent storage
         if [[ -z "$DEEPSEEK_API_KEY" ]]; then
-            load_api_key "$HOME/.deepseek_api_key" "DEEPSEEK_API_KEY"
+            load_api_key_to_var "$HOME/.deepseek_api_key" "DEEPSEEK_API_KEY"
         fi
 
         if [[ -z "$DEEPSEEK_API_KEY" ]]; then
@@ -1926,7 +1928,7 @@ EOF
 
         # Get API key with persistent storage
         if [[ -z "$MISTRAL_API_KEY" ]]; then
-            load_api_key "$HOME/.mistral_api_key" "MISTRAL_API_KEY"
+            load_api_key_to_var "$HOME/.mistral_api_key" "MISTRAL_API_KEY"
         fi
 
         if [[ -z "$MISTRAL_API_KEY" ]]; then
@@ -1958,7 +1960,7 @@ EOF
 
         # Get API key with persistent storage
         if [[ -z "$MOONSHOT_API_KEY" ]]; then
-            load_api_key "$HOME/.moonshot_api_key" "MOONSHOT_API_KEY"
+            load_api_key_to_var "$HOME/.moonshot_api_key" "MOONSHOT_API_KEY"
         fi
 
         if [[ -z "$MOONSHOT_API_KEY" ]]; then
@@ -1990,7 +1992,7 @@ EOF
 
         # Get API key with persistent storage
         if [[ -z "$QWEN_API_KEY" ]]; then
-            load_api_key "$HOME/.qwen_api_key" "QWEN_API_KEY"
+            load_api_key_to_var "$HOME/.qwen_api_key" "QWEN_API_KEY"
         fi
 
         if [[ -z "$QWEN_API_KEY" ]]; then
@@ -2022,7 +2024,7 @@ EOF
 
         # Get API key with persistent storage
         if [[ -z "$OPENROUTER_API_KEY" ]]; then
-            load_api_key "$HOME/.openrouter_api_key" "OPENROUTER_API_KEY"
+            load_api_key_to_var "$HOME/.openrouter_api_key" "OPENROUTER_API_KEY"
         fi
 
         if [[ -z "$OPENROUTER_API_KEY" ]]; then
@@ -2055,6 +2057,11 @@ EOF
         echo ""
 
         # Get Letta API key
+        # Try to load from file first
+        if [[ -z "$LETTA_API_KEY" ]]; then
+            load_api_key_to_var "$HOME/.letta_api_key" "LETTA_API_KEY"
+        fi
+
         if [[ -z "$LETTA_API_KEY" ]]; then
             echo -e "${YELLOW}Letta API Key required${NC}"
             echo "Get your free API key at: https://letta.com"
@@ -2081,8 +2088,8 @@ EOF
         read -p "Pilih [1-5, default: 2]: " model_choice
         [[ -z "$model_choice" ]] && model_choice=2
 
-        # Configure Letta API
-        export ANTHROPIC_API_KEY="$LETTA_API_KEY"
+        # Configure Letta API (IMPORTANT: Use AUTH_TOKEN, not API_KEY!)
+        export ANTHROPIC_AUTH_TOKEN="$LETTA_API_KEY"
         export ANTHROPIC_BASE_URL="https://api.letta.com/v1/anthropic"
 
         system_prompt="You are Letta, a memory-augmented AI agent with persistent memory capabilities. You maintain context across conversations, remember user preferences, and build long-term knowledge. Key features: (1) Long-term memory, (2) Context awareness, (3) Personalization. Always identify yourself as Letta when asked."
@@ -2251,7 +2258,7 @@ EOFMODEL
 
         # Get API key with persistent storage
         if [[ -z "$LETTA_API_KEY" ]]; then
-            load_api_key "$HOME/.letta_api_key" "LETTA_API_KEY"
+            load_api_key_to_var "$HOME/.letta_api_key" "LETTA_API_KEY"
         fi
 
         if [[ -z "$LETTA_API_KEY" ]]; then
