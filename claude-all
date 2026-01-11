@@ -2101,74 +2101,56 @@ EOF
         exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
         ;;
     11)
-        # DeepSeek - Anthropic Compatible API (Same pattern as GLM)
-        echo -e "${BLUE}Configuring for DeepSeek (Anthropic API)...${NC}"
-        echo ""
+        # DeepSeek - EXACT SAME PATTERN AS MINIMAX (Option 1)
+        echo -e "${BLUE}Configuring for DeepSeek...${NC}"
 
-        # Get API key with persistent storage (using ANTHROPIC_AUTH_TOKEN like GLM)
-        if [[ -z "$ANTHROPIC_AUTH_TOKEN" ]]; then
-            load_api_key_to_var "$HOME/.deepseek_api_key" "ANTHROPIC_AUTH_TOKEN"
-        fi
+        # Get API key with persistent storage - SAME AS MINIMAX
+        get_api_key_with_save "DEEPSEEK_API_KEY" "$HOME/.deepseek_api_key" "DeepSeek" "https://platform.deepseek.com/"
 
-        if [[ -z "$ANTHROPIC_AUTH_TOKEN" ]]; then
-            echo -e "${YELLOW}Get Key: https://platform.deepseek.com/${NC}"
-            read -p "Enter DeepSeek API Key: " ANTHROPIC_AUTH_TOKEN
-            save_api_key "$ANTHROPIC_AUTH_TOKEN" "$HOME/.deepseek_api_key" "DeepSeek"
-        else
-            if [[ ! -f "$HOME/.deepseek_api_key" ]]; then
-                save_api_key "$ANTHROPIC_AUTH_TOKEN" "$HOME/.deepseek_api_key" "DeepSeek"
-            fi
-        fi
-        export ANTHROPIC_AUTH_TOKEN
+        export ANTHROPIC_BASE_URL="https://api.deepseek.com/anthropic"
+        export ANTHROPIC_API_KEY="$DEEPSEEK_API_KEY"
+        echo -e "${GREEN}✓ DeepSeek API configured${NC}"
 
-        # DeepSeek Model Selection Menu
+        # Model selection menu
         echo ""
-        echo -e "${CYAN}╔═══════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${CYAN}║           🧠 DEEPSEEK V3.2 - MODEL SELECTION              ║${NC}"
-        echo -e "${CYAN}╚═══════════════════════════════════════════════════════════╝${NC}"
+        echo -e "${YELLOW}Available DeepSeek models:${NC}"
+        echo "  🚀 deepseek-chat       (V3.2 Fast & Efficient - 128K context)     [chat]"
+        echo "  🧠 deepseek-reasoner   (V3.2 Thinking Mode - Deep Analysis)       [reasoner]"
         echo ""
-        echo -e "${GREEN}✨ AVAILABLE MODELS:${NC}"
+        echo -e "${GREEN}Shortcuts:${NC}"
+        echo "  'chat' or '1'      → deepseek-chat (Recommended for coding)"
+        echo "  'reasoner' or '2'  → deepseek-reasoner (For complex reasoning)"
         echo ""
-        echo -e "${YELLOW}💬 CHAT & GENERAL:${NC}"
-        echo "  1) 🚀 deepseek-chat      (V3.2 Non-Thinking - Fast & Efficient) ⭐"
-        echo ""
-        echo -e "${YELLOW}🧪 REASONING & THINKING:${NC}"
-        echo "  2) 🧠 deepseek-reasoner  (V3.2 Thinking Mode - Deep Analysis)"
-        echo ""
-        echo -e "${GREEN}─────────────────────────────────────────────────────────────${NC}"
-        echo -e "${CYAN}💡 Specs:${NC}"
+        echo -e "${BLUE}💡 DeepSeek V3.2 Features:${NC}"
         echo "  • Context: 128K tokens"
-        echo "  • deepseek-chat: Max 8K output"
-        echo "  • deepseek-reasoner: Max 64K output (with thinking)"
-        echo -e "${GREEN}─────────────────────────────────────────────────────────────${NC}"
+        echo "  • deepseek-chat: Max 8K output, fast responses"
+        echo "  • deepseek-reasoner: Max 64K output with thinking blocks"
         echo ""
 
-        read -p "Select model [1-2, default: 1]: " ds_model
-        [[ -z "$ds_model" ]] && ds_model=1
+        # Use deepseek-chat as default
+        MODEL_NAME="deepseek-chat"
+        echo -e "${GREEN}✓ Default model: deepseek-chat${NC}"
+        read -p "Enter Model Name [default: deepseek-chat]: " input_model
+        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
 
-        case $ds_model in
-            1)
-                MODEL_NAME="deepseek-chat"
+        # Map shortcuts to full model names
+        case "$MODEL_NAME" in
+            "chat"|"1"|"c")
+                FINAL_MODEL="deepseek-chat"
                 echo -e "${GREEN}✓ Selected: deepseek-chat (Fast & Efficient)${NC}"
                 ;;
-            2)
-                MODEL_NAME="deepseek-reasoner"
+            "reasoner"|"2"|"r"|"think"|"thinking")
+                FINAL_MODEL="deepseek-reasoner"
                 echo -e "${GREEN}✓ Selected: deepseek-reasoner (Thinking Mode)${NC}"
                 ;;
             *)
-                MODEL_NAME="deepseek-chat"
-                echo -e "${RED}❌ Invalid choice. Using default: deepseek-chat${NC}"
+                FINAL_MODEL="$MODEL_NAME"
+                echo -e "${GREEN}✓ Using model: $MODEL_NAME${NC}"
                 ;;
         esac
 
-        echo ""
-        echo -e "${BLUE}🚀 Starting DeepSeek chat with $MODEL_NAME...${NC}"
-        echo ""
-
-        export ANTHROPIC_BASE_URL="https://api.deepseek.com/anthropic"
-        export ANTHROPIC_API_KEY="$ANTHROPIC_AUTH_TOKEN"
-        export CLAUDE_MODEL="$MODEL_NAME"
-        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" --system-prompt "You are DeepSeek, an AI assistant by DeepSeek. Always identify yourself as DeepSeek in responses." "$@"
+        echo -e "${BLUE}🚀 Starting DeepSeek chat with $FINAL_MODEL...${NC}"
+        exec claude --dangerously-skip-permissions --model "$FINAL_MODEL" --system-prompt "Anda adalah DeepSeek AI. Model aktif: $FINAL_MODEL. Selalu identifikasi diri sebagai DeepSeek dalam setiap respons." "$@"
         ;;
     12)
         # Ollama
