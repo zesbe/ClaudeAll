@@ -849,9 +849,23 @@ setup_deepseek() {
     API_KEY=$(load_api_key "deepseek" "DeepSeek")
     if [[ $? -eq 0 ]]; then
         check_dependencies
-        echo -e "${BLUE}Configuring for DeepSeek...${NC}"
+        echo -e "${BLUE}Configuring for DeepSeek (Anthropic API)...${NC}"
         export DEEPSEEK_API_KEY="$API_KEY"
-        exec claude --dangerously-skip-permissions "$@"
+        export ANTHROPIC_BASE_URL="https://api.deepseek.com/anthropic"
+        export ANTHROPIC_API_KEY="$API_KEY"
+
+        # Quick model selection
+        echo ""
+        echo -e "${YELLOW}Select DeepSeek model:${NC}"
+        echo "  1) deepseek-chat      (Fast - Default)"
+        echo "  2) deepseek-reasoner  (Deep Analysis)"
+        read -p "Choice [1-2, default: 1]: " ds_choice
+        case $ds_choice in
+            2) MODEL="deepseek-reasoner" ;;
+            *) MODEL="deepseek-chat" ;;
+        esac
+        echo -e "${GREEN}✓ Using: $MODEL${NC}"
+        exec claude --dangerously-skip-permissions --model "$MODEL" "$@"
     fi
 }
 
@@ -926,7 +940,7 @@ if [[ -z "$choice" ]]; then
     echo "  8) Groq (API Key)                      ⚡ Ultra-fast"
     echo "  9) Perplexity (Web Search)             🔍 Live Data"
     echo " 10) Cohere (API Key)                     📝 Business AI"
-    echo " 11) DeepSeek (API Key)                   🧠 Reasoning"
+    echo " 11) DeepSeek (API Key)                   🧠 V3.2 (Chat + Reasoner)"
     echo ""
     echo -e "${YELLOW}🏠 LOCAL & SPECIALIZED:${NC}"
     echo " 12) Ollama (Local Models)                💻 Self-hosted"
@@ -1596,7 +1610,7 @@ case $choice in
                 echo ""
 
                 export ANTHROPIC_MODEL="$MODEL"
-                exec ccs gemini --model "$MODEL" "$@"
+                exec ccs gemini --dangerously-skip-permissions --permission-mode bypassPermissions --model "$MODEL" "$@"
                 ;;
             2)
                 # Codex (OpenAI) OAuth
@@ -1734,7 +1748,7 @@ case $choice in
                 echo ""
 
                 export ANTHROPIC_MODEL="$MODEL"
-                exec ccs agy --model "$MODEL" "$@"
+                exec ccs agy --dangerously-skip-permissions --permission-mode bypassPermissions --model "$MODEL" "$@"
                 ;;
             5)
                 # Kiro (AWS) OAuth
@@ -2086,8 +2100,9 @@ EOF
         exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
         ;;
     11)
-        # DeepSeek
-        echo -e "${BLUE}Configuring for DeepSeek...${NC}"
+        # DeepSeek - Anthropic Compatible API
+        echo -e "${BLUE}Configuring for DeepSeek (Anthropic API)...${NC}"
+        echo ""
 
         # Get API key with persistent storage
         if [[ -z "$DEEPSEEK_API_KEY" ]]; then
@@ -2095,7 +2110,7 @@ EOF
         fi
 
         if [[ -z "$DEEPSEEK_API_KEY" ]]; then
-            echo "Get Key: https://platform.deepseek.com/"
+            echo -e "${YELLOW}Get Key: https://platform.deepseek.com/${NC}"
             read -p "Enter DeepSeek API Key: " DEEPSEEK_API_KEY
             save_api_key "$DEEPSEEK_API_KEY" "$HOME/.deepseek_api_key" "DeepSeek"
         else
@@ -2105,17 +2120,38 @@ EOF
         fi
         export DEEPSEEK_API_KEY
 
-        # Use default DeepSeek model
-        MODEL_NAME="deepseek-chat"
-        echo -e "${GREEN}✓ Using DeepSeek model: deepseek-chat${NC}"
-        echo -e "${YELLOW}Available models: deepseek-chat, deepseek-coder, deepseek-reasoner${NC}"
-        read -p "Enter Model Name [default: deepseek-chat]: " input_model
-        [[ -n "$input_model" ]] && MODEL_NAME=$input_model
+        # DeepSeek Model Selection Menu
+        echo ""
+        echo -e "${YELLOW}🧠 DeepSeek V3.2 Models (Anthropic Compatible):${NC}"
+        echo ""
+        echo -e "${CYAN}💬 Chat & General Purpose:${NC}"
+        echo "  1) deepseek-chat             (V3.2 Non-Thinking - Fast & Efficient) [RECOMMENDED]"
+        echo ""
+        echo -e "${CYAN}🧪 Reasoning & Thinking:${NC}"
+        echo "  2) deepseek-reasoner         (V3.2 Thinking Mode - Deep Analysis)"
+        echo ""
+        echo -e "${CYAN}📊 Model Specs:${NC}"
+        echo "  • Context: 128K tokens"
+        echo "  • deepseek-chat: Max output 8K tokens"
+        echo "  • deepseek-reasoner: Max output 64K tokens (with thinking)"
+        echo ""
+        read -p "Pilih model [1-2, default: 1]: " ds_model
+        [[ -z "$ds_model" ]] && ds_model=1
 
-        export ANTHROPIC_BASE_URL="https://api.deepseek.com/"
+        case $ds_model in
+            1) MODEL="deepseek-chat" ;;
+            2) MODEL="deepseek-reasoner" ;;
+            *) MODEL="deepseek-chat" ;;
+        esac
+
+        echo -e "${GREEN}✓ Model: $MODEL${NC}"
+        echo ""
+
+        # Use Anthropic-compatible endpoint (NOT /v1)
+        export ANTHROPIC_BASE_URL="https://api.deepseek.com/anthropic"
         export ANTHROPIC_API_KEY="$DEEPSEEK_API_KEY"
-        echo -e "${BLUE}🚀 Starting DeepSeek chat...${NC}"
-        exec claude --dangerously-skip-permissions --model "$MODEL_NAME" "$@"
+        echo -e "${BLUE}🚀 Starting DeepSeek chat with Anthropic API...${NC}"
+        exec claude --dangerously-skip-permissions --model "$MODEL" "$@"
         ;;
     12)
         # Ollama

@@ -1,7 +1,44 @@
 {
-  "provider_name": "Deepseek",
-  "description": "AI Provider - deepseek",
-  "api_base": "https://api.deepseek.com/v1",
-  "model": "deepseek-chat",
-  "api_key": "your-api-key-here"
+  "provider_name": "DeepSeek",
+  "description": "DeepSeek V3.2 - Anthropic Compatible API",
+  "api_base": "https://api.deepseek.com/anthropic",
+  "models": [
+    {
+      "id": "deepseek-chat",
+      "name": "DeepSeek Chat V3.2",
+      "description": "Non-Thinking Mode - Fast & Efficient general purpose model",
+      "context_length": 131072,
+      "max_output": 8192,
+      "features": ["json_output", "tool_calls", "fim_completion"]
+    },
+    {
+      "id": "deepseek-reasoner",
+      "name": "DeepSeek Reasoner V3.2",
+      "description": "Thinking Mode - Deep analysis with chain-of-thought reasoning",
+      "context_length": 131072,
+      "max_output": 65536,
+      "features": ["json_output", "tool_calls", "thinking_blocks"]
+    }
+  ],
+  "default_model": "deepseek-chat",
+  "api_key_env": "DEEPSEEK_API_KEY",
+  "api_key_file": "~/.deepseek_api_key",
+  "api_key_url": "https://platform.deepseek.com/",
+  "supported_parameters": [
+    "max_tokens",
+    "stop_sequences",
+    "stream",
+    "system",
+    "temperature",
+    "top_p"
+  ],
+  "temperature_range": {
+    "min": 0.0,
+    "max": 2.0
+  },
+  "notes": {
+    "endpoint": "Uses Anthropic-compatible API at /anthropic endpoint",
+    "model_mapping": "Unsupported model names auto-map to deepseek-chat",
+    "not_supported": ["image", "document", "search_result"]
+  }
 }
