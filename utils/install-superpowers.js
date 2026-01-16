@@ -207,10 +207,16 @@ class SuperpowersInstaller {
 
         const hooksSource = path.join(this.superpowersDir, 'hooks');
         const hooksDest = this.claudeHooksDir;
+        const claudeMainHooksDir = path.join(this.claudeDir, 'hooks');
 
         if (!fs.existsSync(hooksSource)) {
             console.log('  ⚠️  No hooks directory found');
             return;
+        }
+
+        // Ensure main hooks directory exists
+        if (!fs.existsSync(claudeMainHooksDir)) {
+            fs.mkdirSync(claudeMainHooksDir, { recursive: true });
         }
 
         const hooks = fs.readdirSync(hooksSource);
@@ -218,16 +224,22 @@ class SuperpowersInstaller {
 
         hooks.forEach(hook => {
             const srcPath = path.join(hooksSource, hook);
-            const destPath = path.join(hooksDest, hook);
 
-            const numFiles = this.copyDirectory(srcPath, destPath, hook);
-            if (numFiles > 0) {
-                console.log(`  ✅ ${hook} (${numFiles} files)`);
+            // Copy to plugin hooks directory
+            const destPath1 = path.join(hooksDest, hook);
+            const numFiles1 = this.copyDirectory(srcPath, destPath1, hook);
+
+            // Also copy to main Claude hooks directory (so they can be executed)
+            const destPath2 = path.join(claudeMainHooksDir, hook);
+            const numFiles2 = this.copyDirectory(srcPath, destPath2, hook);
+
+            if (numFiles1 > 0) {
+                console.log(`  ✅ ${hook} (${numFiles1} files) → plugins & main hooks`);
                 count++;
             }
         });
 
-        console.log(`📊 Total: ${count} hooks installed`);
+        console.log(`📊 Total: ${count} hooks installed (to both locations)`);
     }
 
     installLibs() {
