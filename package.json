@@ -1,6 +1,6 @@
 {
   "name": "claude-all-ai-launcher",
-  "version": "8.4.5",
+  "version": "8.4.6",
   "description": "🤖 Universal AI CLI Launcher - Claude Code with ANY AI Provider + Enhanced Terminal Tools (MiniMax, Gemini, OpenAI, Groq, Ollama, Custom APIs)",
   "main": "index.js",
   "bin": {
