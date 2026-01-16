@@ -14,6 +14,8 @@ class SuperpowersUninstaller {
         this.homeDir = os.homedir();
         this.claudeDir = path.join(this.homeDir, '.claude');
         this.claudePluginsDir = path.join(this.claudeDir, 'plugins', 'claude-all-superpowers');
+        this.claudeGlobalAgentsDir = path.join(this.claudeDir, 'agents');
+        this.claudeHooksDir = path.join(this.claudeDir, 'hooks');
     }
 
     printHeader() {
@@ -71,23 +73,10 @@ class SuperpowersUninstaller {
             return;
         }
 
-        // Read manifest if exists to identify which commands were installed
-        const manifestPath = path.join(this.claudePluginsDir, 'manifest.json');
-        let installedCommands = [];
-
-        if (fs.existsSync(manifestPath)) {
-            try {
-                const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-                // Could track installed commands in manifest
-            } catch (e) {
-                // Ignore
-            }
-        }
-
-        // For now, remove all claude-all related commands
+        // Remove all claude-all related commands
         const commands = fs.readdirSync(commandsDir).filter(f => {
-            // You might want to be more specific about which commands to remove
-            return f.startsWith('claude-') || f.startsWith('git-') || f.startsWith('gen-');
+            return f.startsWith('claude-') || f.startsWith('git-') || f.startsWith('gen-') ||
+                   f === 'brainstorm.md' || f === 'execute-plan.md' || f === 'write-plan.md';
         });
 
         let count = 0;
@@ -105,6 +94,68 @@ class SuperpowersUninstaller {
         }
     }
 
+    removeAgents() {
+        console.log('');
+        console.log('🗑️  Removing global agents...');
+
+        if (!fs.existsSync(this.claudeGlobalAgentsDir)) {
+            console.log('  ⚠️  No global agents directory found');
+            return;
+        }
+
+        // Remove all agents from global folder
+        const agents = fs.readdirSync(this.claudeGlobalAgentsDir).filter(f => f.endsWith('.md'));
+
+        let count = 0;
+        agents.forEach(agent => {
+            const agentPath = path.join(this.claudeGlobalAgentsDir, agent);
+            fs.unlinkSync(agentPath);
+            console.log(`  ✅ Removed: ${agent}`);
+            count++;
+        });
+
+        if (count === 0) {
+            console.log('  ℹ️  No claude-all agents to remove');
+        } else {
+            console.log(`📊 Removed ${count} global agents`);
+
+            // Remove directory if empty
+            if (fs.readdirSync(this.claudeGlobalAgentsDir).length === 0) {
+                fs.rmdirSync(this.claudeGlobalAgentsDir);
+                console.log(`  ✅ Removed empty directory: ${this.claudeGlobalAgentsDir}`);
+            }
+        }
+    }
+
+    removeGlobalHooks() {
+        console.log('');
+        console.log('🗑️  Removing global hooks...');
+
+        if (!fs.existsSync(this.claudeHooksDir)) {
+            console.log('  ⚠️  No hooks directory found');
+            return;
+        }
+
+        // Remove claude-all specific hooks
+        const hooks = ['hooks.json', 'run-hook.cmd', 'session-start.sh'];
+        let count = 0;
+
+        hooks.forEach(hook => {
+            const hookPath = path.join(this.claudeHooksDir, hook);
+            if (fs.existsSync(hookPath)) {
+                fs.unlinkSync(hookPath);
+                console.log(`  ✅ Removed: ${hook}`);
+                count++;
+            }
+        });
+
+        if (count === 0) {
+            console.log('  ℹ️  No claude-all hooks to remove');
+        } else {
+            console.log(`📊 Removed ${count} global hooks`);
+        }
+    }
+
     uninstall() {
         try {
             this.printHeader();
@@ -115,8 +166,14 @@ class SuperpowersUninstaller {
                 return;
             }
 
-            // Remove commands first
+            // Remove commands
             this.removeCommands();
+
+            // Remove global agents
+            this.removeAgents();
+
+            // Remove global hooks
+            this.removeGlobalHooks();
 
             // Remove main plugin directory
             console.log('');

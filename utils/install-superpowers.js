@@ -22,6 +22,7 @@ class SuperpowersInstaller {
         this.claudeCommandsDir = path.join(this.claudeDir, 'commands');
         this.claudeSkillsDir = path.join(this.claudePluginsDir, 'skills');
         this.claudeAgentsDir = path.join(this.claudePluginsDir, 'agents');
+        this.claudeGlobalAgentsDir = path.join(this.claudeDir, 'agents'); // Global agents folder
         this.claudeHooksDir = path.join(this.claudePluginsDir, 'hooks');
         this.claudeLibDir = path.join(this.claudePluginsDir, 'lib');
         this.claudeTestsDir = path.join(this.claudePluginsDir, 'tests');
@@ -179,11 +180,17 @@ class SuperpowersInstaller {
         console.log('🤖 Installing Agents...');
 
         const agentsSource = path.join(this.superpowersDir, 'agents');
-        const agentsDest = this.claudeAgentsDir;
+        const agentsPluginDir = this.claudeAgentsDir;
+        const agentsGlobalDir = this.claudeGlobalAgentsDir;
 
         if (!fs.existsSync(agentsSource)) {
             console.log('  ⚠️  No agents directory found');
             return;
+        }
+
+        // Ensure global agents directory exists
+        if (!fs.existsSync(agentsGlobalDir)) {
+            fs.mkdirSync(agentsGlobalDir, { recursive: true });
         }
 
         const agents = fs.readdirSync(agentsSource);
@@ -191,16 +198,20 @@ class SuperpowersInstaller {
 
         agents.forEach(agent => {
             const srcPath = path.join(agentsSource, agent);
-            const destPath = path.join(agentsDest, agent);
 
-            const numFiles = this.copyDirectory(srcPath, destPath, agent);
-            if (numFiles > 0) {
-                console.log(`  ✅ ${agent} (${numFiles} files)`);
-                count++;
-            }
+            // Copy to plugin agents directory
+            const destPath1 = path.join(agentsPluginDir, agent);
+            fs.copyFileSync(srcPath, destPath1);
+
+            // Also copy to global Claude agents directory (so they're available globally)
+            const destPath2 = path.join(agentsGlobalDir, agent);
+            fs.copyFileSync(srcPath, destPath2);
+
+            console.log(`  ✅ ${agent} → plugin & global`);
+            count++;
         });
 
-        console.log(`📊 Total: ${count} agents installed`);
+        console.log(`📊 Total: ${count} agents installed (to both locations)`);
     }
 
     installHooks() {
