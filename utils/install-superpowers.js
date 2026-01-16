@@ -24,6 +24,7 @@ class SuperpowersInstaller {
         this.claudeAgentsDir = path.join(this.claudePluginsDir, 'agents');
         this.claudeHooksDir = path.join(this.claudePluginsDir, 'hooks');
         this.claudeLibDir = path.join(this.claudePluginsDir, 'lib');
+        this.claudeTestsDir = path.join(this.claudePluginsDir, 'tests');
     }
 
     printHeader() {
@@ -37,6 +38,7 @@ class SuperpowersInstaller {
         console.log('  ✅ Agents (task automation)');
         console.log('  ✅ Hooks (git hooks)');
         console.log('  ✅ Libraries (helper functions)');
+        console.log('  ✅ Tests (test suites)');
         console.log('');
     }
 
@@ -269,6 +271,35 @@ class SuperpowersInstaller {
         console.log(`📊 Total: ${count} libraries installed`);
     }
 
+    installTests() {
+        console.log('');
+        console.log('🧪 Installing Tests...');
+
+        const testsSource = path.join(this.superpowersDir, 'tests');
+        const testsDest = this.claudeTestsDir;
+
+        if (!fs.existsSync(testsSource)) {
+            console.log('  ⚠️  No tests directory found');
+            return;
+        }
+
+        const testSuites = fs.readdirSync(testsSource);
+        let count = 0;
+
+        testSuites.forEach(suite => {
+            const srcPath = path.join(testsSource, suite);
+            const destPath = path.join(testsDest, suite);
+
+            const numFiles = this.copyDirectory(srcPath, destPath, suite);
+            if (numFiles > 0) {
+                console.log(`  ✅ ${suite} (${numFiles} files)`);
+                count++;
+            }
+        });
+
+        console.log(`📊 Total: ${count} test suites installed`);
+    }
+
     createManifest() {
         console.log('');
         console.log('📋 Creating manifest...');
@@ -283,7 +314,8 @@ class SuperpowersInstaller {
                 commands: fs.existsSync(this.claudeCommandsDir) ? fs.readdirSync(this.claudeCommandsDir).filter(f => f.endsWith('.md')).length : 0,
                 agents: fs.existsSync(this.claudeAgentsDir) ? fs.readdirSync(this.claudeAgentsDir).length : 0,
                 hooks: fs.existsSync(this.claudeHooksDir) ? fs.readdirSync(this.claudeHooksDir).length : 0,
-                libs: fs.existsSync(this.claudeLibDir) ? fs.readdirSync(this.claudeLibDir).length : 0
+                libs: fs.existsSync(this.claudeLibDir) ? fs.readdirSync(this.claudeLibDir).length : 0,
+                tests: fs.existsSync(this.claudeTestsDir) ? fs.readdirSync(this.claudeTestsDir).length : 0
             }
         };
 
@@ -311,6 +343,7 @@ class SuperpowersInstaller {
         console.log('   • Agents - Task automation');
         console.log('   • Hooks - Git hooks');
         console.log('   • Libraries - Helper functions');
+        console.log('   • Tests - Test suites');
         console.log('');
         console.log('💡 Tip: Use /help in Claude Code to see available commands');
         console.log('');
@@ -332,6 +365,7 @@ class SuperpowersInstaller {
             this.installAgents();
             this.installHooks();
             this.installLibs();
+            this.installTests();
             this.createManifest();
             this.showCompletion();
 
