@@ -14,6 +14,7 @@ class SuperpowersUninstaller {
         this.homeDir = os.homedir();
         this.claudeDir = path.join(this.homeDir, '.claude');
         this.claudePluginsDir = path.join(this.claudeDir, 'plugins', 'claude-all-superpowers');
+        this.claudeGlobalSkillsDir = path.join(this.claudeDir, 'skills');
         this.claudeGlobalAgentsDir = path.join(this.claudeDir, 'agents');
         this.claudeHooksDir = path.join(this.claudeDir, 'hooks');
     }
@@ -156,6 +157,68 @@ class SuperpowersUninstaller {
         }
     }
 
+    removeSkills() {
+        console.log('');
+        console.log('🗑️  Removing global skills...');
+
+        if (!fs.existsSync(this.claudeGlobalSkillsDir)) {
+            console.log('  ⚠️  No global skills directory found');
+            return;
+        }
+
+        // Remove all skills from global folder
+        const skills = fs.readdirSync(this.claudeGlobalSkillsDir);
+        let count = 0;
+
+        skills.forEach(skill => {
+            const skillPath = path.join(this.claudeGlobalSkillsDir, skill);
+            const stat = fs.statSync(skillPath);
+
+            if (stat.isDirectory()) {
+                // Remove directory recursively
+                const remove = (dir) => {
+                    const items = fs.readdirSync(dir);
+                    items.forEach(item => {
+                        const fullPath = path.join(dir, item);
+                        const itemStat = fs.statSync(fullPath);
+
+                        if (itemStat.isDirectory()) {
+                            remove(fullPath);
+                            fs.rmdirSync(fullPath);
+                        } else {
+                            fs.unlinkSync(fullPath);
+                        }
+                    });
+                };
+
+                remove(skillPath);
+                fs.rmdirSync(skillPath);
+                console.log(`  ✅ Removed: ${skill}/`);
+                count++;
+            } else {
+                fs.unlinkSync(skillPath);
+                console.log(`  ✅ Removed: ${skill}`);
+                count++;
+            }
+        });
+
+        if (count === 0) {
+            console.log('  ℹ️  No claude-all skills to remove');
+        } else {
+            console.log(`📊 Removed ${count} skills`);
+
+            // Remove directory if empty
+            try {
+                if (fs.readdirSync(this.claudeGlobalSkillsDir).length === 0) {
+                    fs.rmdirSync(this.claudeGlobalSkillsDir);
+                    console.log(`  ✅ Removed empty directory: ${this.claudeGlobalSkillsDir}`);
+                }
+            } catch (e) {
+                // Directory not empty or other error, ignore
+            }
+        }
+    }
+
     uninstall() {
         try {
             this.printHeader();
@@ -168,6 +231,9 @@ class SuperpowersUninstaller {
 
             // Remove commands
             this.removeCommands();
+
+            // Remove global skills
+            this.removeSkills();
 
             // Remove global agents
             this.removeAgents();

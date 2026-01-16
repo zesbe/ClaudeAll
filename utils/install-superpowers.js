@@ -21,6 +21,7 @@ class SuperpowersInstaller {
         this.claudePluginsDir = path.join(this.claudeDir, 'plugins', 'claude-all-superpowers');
         this.claudeCommandsDir = path.join(this.claudeDir, 'commands');
         this.claudeSkillsDir = path.join(this.claudePluginsDir, 'skills');
+        this.claudeGlobalSkillsDir = path.join(this.claudeDir, 'skills'); // Global skills folder
         this.claudeAgentsDir = path.join(this.claudePluginsDir, 'agents');
         this.claudeGlobalAgentsDir = path.join(this.claudeDir, 'agents'); // Global agents folder
         this.claudeHooksDir = path.join(this.claudePluginsDir, 'hooks');
@@ -124,11 +125,17 @@ class SuperpowersInstaller {
         console.log('🎯 Installing Skills...');
 
         const skillsSource = path.join(this.superpowersDir, 'skills');
-        const skillsDest = this.claudeSkillsDir;
+        const skillsPluginDir = this.claudeSkillsDir;
+        const skillsGlobalDir = this.claudeGlobalSkillsDir;
 
         if (!fs.existsSync(skillsSource)) {
             console.log('  ⚠️  No skills directory found');
             return;
+        }
+
+        // Ensure global skills directory exists
+        if (!fs.existsSync(skillsGlobalDir)) {
+            fs.mkdirSync(skillsGlobalDir, { recursive: true });
         }
 
         const skills = fs.readdirSync(skillsSource);
@@ -136,16 +143,22 @@ class SuperpowersInstaller {
 
         skills.forEach(skill => {
             const srcPath = path.join(skillsSource, skill);
-            const destPath = path.join(skillsDest, skill);
 
-            const numFiles = this.copyDirectory(srcPath, destPath, skill);
-            if (numFiles > 0) {
-                console.log(`  ✅ ${skill} (${numFiles} files)`);
+            // Copy to plugin skills directory
+            const destPath1 = path.join(skillsPluginDir, skill);
+            const numFiles1 = this.copyDirectory(srcPath, destPath1, skill);
+
+            // Also copy to global Claude skills directory (so they're available globally)
+            const destPath2 = path.join(skillsGlobalDir, skill);
+            const numFiles2 = this.copyDirectory(srcPath, destPath2, skill);
+
+            if (numFiles1 > 0) {
+                console.log(`  ✅ ${skill} (${numFiles1} files) → plugin & global`);
                 count++;
             }
         });
 
-        console.log(`📊 Total: ${count} skills installed`);
+        console.log(`📊 Total: ${count} skills installed (to both locations)`);
     }
 
     installCommands() {
