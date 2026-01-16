@@ -10,8 +10,10 @@
     "switch-provider": "./bin/switch-provider"
   },
   "scripts": {
-    "install": "node utils/install.js",
+    "install": "node utils/install.js && node utils/install-superpowers.js",
     "postinstall": "node utils/postinstall.js",
+    "install-superpowers": "node utils/install-superpowers.js",
+    "uninstall-superpowers": "node utils/uninstall-superpowers.js",
     "claude": "node claude-all",
     "launch": "node bin/claude-all",
     "switch": "node bin/switch-provider",
