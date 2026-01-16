@@ -6,11 +6,27 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 class PostInstall {
     constructor() {
         this.homeDir = require('os').homedir();
         this.installDir = path.join(this.homeDir, '.claude-all');
+    }
+
+    installSuperpowers() {
+        try {
+            console.log('');
+            console.log('🦸 Installing Claude-All Superpowers...');
+            console.log('=====================================');
+
+            const installScript = path.join(__dirname, 'install-superpowers.js');
+            execSync(`node "${installScript}"`, { stdio: 'inherit' });
+
+        } catch (error) {
+            console.error('❌ Failed to install superpowers:', error.message);
+            // Don't exit, continue with welcome message
+        }
     }
 
     showWelcome() {
@@ -35,6 +51,7 @@ class PostInstall {
     }
 
     run() {
+        this.installSuperpowers();
         this.showWelcome();
     }
 }
